@@ -1,0 +1,6 @@
+{
+  "name": "Tech Doctor",
+  "description": "Professional phone repair, smartphone sales, and mobile accessories with instant booking, live quote estimator, and shop catalog.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
