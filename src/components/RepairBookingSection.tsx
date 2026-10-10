@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { DEVICE_CATALOG, REPAIR_SERVICES, REPAIR_PRICE_ESTIMATES } from '../data/mockData';
+import React, { useEffect, useState } from 'react';
+import { useGetRepairCatalogQuery } from '../features/repairCatalog/repairCatalogApi';
 import { 
   Wrench, 
   CheckCircle, 
@@ -22,9 +22,10 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
   initialService = 'Screen & OLED Replacement',
   onSuccessToast,
 }) => {
-  const [brand, setBrand] = useState<string>('Apple');
-  const [model, setModel] = useState<string>('iPhone 16 Pro');
-  const [repairType, setRepairType] = useState<string>(initialService);
+  const { data: catalog = [], isLoading: isCatalogLoading } = useGetRepairCatalogQuery();
+  const [brandId, setBrandId] = useState<number | null>(null);
+  const [modelId, setModelId] = useState<number | null>(null);
+  const [serviceLinkId, setServiceLinkId] = useState<number | null>(null);
   const [serviceMode, setServiceMode] = useState<'in-store' | 'courier-pickup' | 'mail-in'>('in-store');
   const [preferredDate, setPreferredDate] = useState<string>(
     new Date(Date.now() + 86400000).toISOString().split('T')[0]
@@ -40,29 +41,42 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [bookingRef, setBookingRef] = useState<string>('');
 
-  const availableModels = DEVICE_CATALOG[brand as keyof typeof DEVICE_CATALOG] || DEVICE_CATALOG['Apple'];
+  useEffect(() => {
+    if (!catalog.length || brandId !== null) return;
+    setBrandId(catalog[0].id);
+  }, [brandId, catalog]);
 
-  const handleBrandChange = (newBrand: string) => {
-    setBrand(newBrand);
-    const models = DEVICE_CATALOG[newBrand as keyof typeof DEVICE_CATALOG] || [];
-    if (models.length > 0) {
-      setModel(models[0]);
-    }
+  const selectedBrand = catalog.find((entry) => entry.id === brandId) ?? null;
+  const availableModels = selectedBrand?.models ?? [];
+  const selectedModel = availableModels.find((entry) => entry.id === modelId) ?? null;
+  const availableServices = selectedModel?.services ?? [];
+  const selectedServiceLink = availableServices.find((entry) => entry.id === serviceLinkId) ?? null;
+  const brand = selectedBrand?.name ?? '';
+  const model = selectedModel?.name ?? '';
+  const repairType = selectedServiceLink?.service.name ?? '';
+  const estimatedPrice = selectedServiceLink?.price === null || selectedServiceLink?.price === undefined ? null : Number(selectedServiceLink.price);
+  const selectedServiceObj = selectedServiceLink?.service;
+
+  const handleBrandChange = (newBrandId: number) => {
+    setBrandId(newBrandId);
+    setModelId(null);
+    setServiceLinkId(null);
   };
 
-  const getEstimatedPrice = () => {
-    const serviceEstimates = REPAIR_PRICE_ESTIMATES[repairType];
-    if (!serviceEstimates) return 69;
-    if (serviceEstimates[model]) return serviceEstimates[model];
-    return serviceEstimates['default'] || 69;
-  };
+  useEffect(() => {
+    if (!availableModels.length) return;
+    if (!availableModels.some((entry) => entry.id === modelId)) setModelId(availableModels[0].id);
+  }, [availableModels, modelId]);
 
-  const estimatedPrice = getEstimatedPrice();
-  const selectedServiceObj = REPAIR_SERVICES.find((s) => s.title === repairType) || REPAIR_SERVICES[0];
+  useEffect(() => {
+    if (!availableServices.length) return;
+    const initial = availableServices.find((entry) => entry.service.name === initialService);
+    if (!availableServices.some((entry) => entry.id === serviceLinkId)) setServiceLinkId(initial?.id ?? availableServices[0].id);
+  }, [availableServices, initialService, serviceLinkId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !phone) return;
+    if (!name || !phone || !selectedBrand || !selectedModel || !selectedServiceLink) return;
 
     setIsSubmitting(true);
     setTimeout(() => {
@@ -146,7 +160,7 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
                 <div className="flex justify-between pt-1">
                   <span className="text-white/40">Estimated Quote:</span>
                   <span className="font-bold text-[#D4AF37] text-sm">
-                    {estimatedPrice === 0 ? 'Free Diagnostic' : `$${estimatedPrice}.00`}
+                    {estimatedPrice === null ? 'Quote on inspection' : estimatedPrice === 0 ? 'Free Diagnostic' : `$${estimatedPrice.toFixed(2)}`}
                   </span>
                 </div>
               </div>
@@ -175,18 +189,20 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-                  {(['Apple', 'Samsung', 'Google', 'OnePlus', 'Other'] as const).map((b) => (
+                  {isCatalogLoading && <p className="col-span-full py-2 text-xs text-white/50">Loading available devices…</p>}
+                  {!isCatalogLoading && catalog.length === 0 && <p className="col-span-full py-2 text-xs text-amber-300">No repair devices are available yet. Please contact the store.</p>}
+                  {catalog.map((catalogBrand) => (
                     <button
                       type="button"
-                      key={b}
-                      onClick={() => handleBrandChange(b)}
+                      key={catalogBrand.id}
+                      onClick={() => handleBrandChange(catalogBrand.id)}
                       className={`p-3 rounded-sm border text-xs font-semibold tracking-wider transition-all cursor-pointer ${
-                        brand === b
+                        brandId === catalogBrand.id
                           ? 'bg-[#D4AF37] text-black border-[#D4AF37] shadow-sm font-bold'
                           : 'bg-[#151515] text-white/70 border-white/5 hover:border-white/20 hover:text-white'
                       }`}
                     >
-                      {b}
+                      {catalogBrand.name}
                     </button>
                   ))}
                 </div>
@@ -208,12 +224,14 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
                       Device Model
                     </label>
                     <select
-                      value={model}
-                      onChange={(e) => setModel(e.target.value)}
+                      value={modelId ?? ''}
+                      onChange={(e) => { setModelId(Number(e.target.value)); setServiceLinkId(null); }}
+                      disabled={!availableModels.length || isCatalogLoading}
                       className="w-full bg-[#151515] border border-white/10 rounded-sm px-3.5 py-2.5 text-xs font-semibold text-white focus:outline-none focus:border-[#D4AF37]"
                     >
-                      {availableModels.map((m) => (
-                        <option key={m} value={m} className="bg-[#111111] text-white">{m}</option>
+                      {!availableModels.length && <option value="">No models available</option>}
+                      {availableModels.map((entry) => (
+                        <option key={entry.id} value={entry.id} className="bg-[#111111] text-white">{entry.name}</option>
                       ))}
                     </select>
                   </div>
@@ -223,12 +241,14 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
                       Repair Issue Needed
                     </label>
                     <select
-                      value={repairType}
-                      onChange={(e) => setRepairType(e.target.value)}
+                      value={serviceLinkId ?? ''}
+                      onChange={(e) => setServiceLinkId(Number(e.target.value))}
+                      disabled={!availableServices.length || isCatalogLoading}
                       className="w-full bg-[#151515] border border-white/10 rounded-sm px-3.5 py-2.5 text-xs font-semibold text-white focus:outline-none focus:border-[#D4AF37]"
                     >
-                      {REPAIR_SERVICES.map((s) => (
-                        <option key={s.id} value={s.title} className="bg-[#111111] text-white">{s.title}</option>
+                      {!availableServices.length && <option value="">No repair issues available</option>}
+                      {availableServices.map((entry) => (
+                        <option key={entry.id} value={entry.id} className="bg-[#111111] text-white">{entry.service.name}</option>
                       ))}
                     </select>
                   </div>
@@ -244,14 +264,14 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
                       </span>
                     </div>
                     <p className="text-[11px] text-white/40">
-                      Turnaround: <strong className="text-white/70">{selectedServiceObj.estimatedTime}</strong> &bull; Warranty: <strong className="text-white/70">{selectedServiceObj.warranty}</strong>
+                      Turnaround: <strong className="text-white/70">{selectedServiceObj?.estimatedTime ?? 'To be confirmed'}</strong> &bull; Warranty: <strong className="text-white/70">{selectedServiceObj?.warranty ?? 'To be confirmed'}</strong>
                     </p>
                   </div>
 
                   <div className="text-right">
                     <span className="text-xs text-white/40 block">Estimated Quote</span>
                     <span className="text-2xl font-light text-[#D4AF37]">
-                      {estimatedPrice === 0 ? 'FREE DIAGNOSTIC' : `$${estimatedPrice}.00`}
+                      {estimatedPrice === null ? 'QUOTE ON INSPECTION' : estimatedPrice === 0 ? 'FREE DIAGNOSTIC' : `$${estimatedPrice.toFixed(2)}`}
                     </span>
                   </div>
                 </div>
@@ -400,7 +420,7 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
 
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !selectedServiceLink}
                   className="w-full sm:w-auto bg-[#D4AF37] hover:bg-[#C19A2F] disabled:bg-neutral-800 text-black font-semibold text-xs tracking-wider uppercase px-8 py-3.5 rounded-sm shadow-xl transition-all flex items-center justify-center space-x-2 cursor-pointer"
                 >
                   <Wrench className="w-4 h-4 text-black" />

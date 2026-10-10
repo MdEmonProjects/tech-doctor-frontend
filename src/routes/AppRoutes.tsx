@@ -23,6 +23,8 @@ import type { OverlayLocationState } from './routeUtils';
 import { ProtectedRoute } from './ProtectedRoute';
 import DashboardLayout from '../components/DashboardLayout';
 import Dashboard from '../pages/Admin/Dashboard';
+import RepairBrandsServices from '../pages/Admin/RepairBrandsServices';
+import RepairBrandModels from '../pages/Admin/RepairBrandModels';
 import Login from '../pages/Login';
 import { useMeQuery } from '../features/auth/authQuerySlice';
 import { logout, syncUser } from '../features/auth/authSlice';
@@ -80,6 +82,8 @@ export function AppRoutes() {
           }
         >
           <Route index element={<Dashboard />} />
+          <Route path="repair-service/brands-services" element={<RepairBrandsServices />} />
+          <Route path="repair-service/brands-services/:brandId" element={<RepairBrandModels />} />
         </Route>
         <Route
           path="admin/dashboard"

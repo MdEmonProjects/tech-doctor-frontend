@@ -1,12 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { logout } from '../../features/auth/authSlice';
-import {
-  deleteConversation,
-  newConversation,
-  selectConversation,
-} from '../../features/chat/chatSlice';
 import {
   closeMobileSidebar as closeUiMobileSidebar,
   resetSidebarWidth as resetUiSidebarWidth,
@@ -14,17 +9,17 @@ import {
   setSidebarWidth as setUiSidebarWidth,
   toggleSidebarCollapsed as toggleUiSidebarCollapsed,
 } from '../../features/ui/uiSlice';
-import SvgIcon from '../icons/SvgIcon';
+import SvgIcon from '../icons/SvgIcon.tsx';
 import { menuData } from './data';
+import type { AppDispatch, RootState } from '../../app/store';
 
 export default function Sidebar() {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const location = useLocation();
-  const user = useSelector((state) => state.auth.user);
-  const { conversations, activeConversationId } = useSelector((state) => state.chat);
+  const user = useSelector((state: RootState) => state.auth.user);
   const { mobileSidebarOpen, sidebarCollapsed, sidebarWidth, isResizingSidebar } = useSelector(
-    (state) => state.ui
+    (state: RootState) => state.ui
   );
   const [menuOpen, setMenuOpen] = useState(false);
   const [openSubmenuId, setOpenSubmenuId] = useState(() => {
@@ -34,10 +29,10 @@ export default function Sidebar() {
     );
     return activeParent?.id ?? null;
   });
-  const asideRef = useRef(null);
+  const asideRef = useRef<HTMLElement | null>(null);
 
   const handleResizeMove = useCallback(
-    (event) => {
+    (event: MouseEvent) => {
       const left = asideRef.current?.getBoundingClientRect().left ?? 0;
       dispatch(setUiSidebarWidth(event.clientX - left));
     },
@@ -51,7 +46,7 @@ export default function Sidebar() {
     window.removeEventListener('mousemove', handleResizeMove);
   }, [dispatch, handleResizeMove]);
 
-  const handleResizeStart = (event) => {
+  const handleResizeStart = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (sidebarCollapsed) return;
     event.preventDefault();
     dispatch(setUiResizingSidebar(true));
@@ -66,12 +61,6 @@ export default function Sidebar() {
     window.removeEventListener('mouseup', handleResizeEnd);
   }, [handleResizeMove, handleResizeEnd]);
 
-  const handleSelectConversation = (id) => {
-    dispatch(selectConversation(id));
-    dispatch(closeUiMobileSidebar());
-    navigate('/dashboard');
-  };
-
   const handleLogout = () => {
     dispatch(logout());
     navigate('/login', { replace: true });
@@ -82,7 +71,7 @@ export default function Sidebar() {
   return (
     <aside
       ref={asideRef}
-      style={{ '--sidebar-width': `${sidebarCollapsed ? 64 : sidebarWidth}px` }}
+      style={{ '--sidebar-width': `${sidebarCollapsed ? 64 : sidebarWidth}px` } as CSSProperties}
       className={`
         app-sidebar fixed inset-y-0 left-0 z-50 flex max-w-full flex-col border-r border-gray-200 bg-gray-50
         md:static md:translate-x-0
@@ -95,7 +84,7 @@ export default function Sidebar() {
       <div className="flex items-center gap-2 p-3">
         <div className={`flex flex-1 items-center gap-2 ${sidebarCollapsed ? 'md:justify-center' : ''}`}>
           <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-clay text-sm font-bold text-white">D</div>
-          <span className={`text-[20px] font-semibold text-gray-900 ${sidebarCollapsed ? 'md:hidden' : ''}`}>সাইডবার</span>
+          <span className={`text-[20px] font-semibold text-gray-900 ${sidebarCollapsed ? 'md:hidden' : ''}`}>Qmmsoft</span>
         </div>
         {/* <button
           onClick={() => dispatch(toggleUiSidebarCollapsed())}
@@ -110,7 +99,6 @@ export default function Sidebar() {
       </div>
       <button
         type="button"
-        aria-label={mobileSidebarOpen ? 'সাইডবার বন্ধ করুন' : sidebarCollapsed ? 'সাইডবার প্রসারিত করুন' : 'সাইডবার সংকুচিত করুন'}
         aria-expanded={mobileSidebarOpen || !sidebarCollapsed}
         onClick={() => {
           if (window.matchMedia('(min-width: 768px)').matches) {
@@ -193,7 +181,7 @@ export default function Sidebar() {
                   <span className={sidebarCollapsed ? 'md:hidden' : ''}>{item.name}</span>
                 </NavLink>
               )}
-              {hasSubmenu && isSubmenuOpen && (
+              {Array.isArray(item.subMenu) && isSubmenuOpen && (
                 <div className={`mt-0.5 space-y-0.5 pl-5 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
                   {item.subMenu.map((subItem) => (
                     <NavLink
