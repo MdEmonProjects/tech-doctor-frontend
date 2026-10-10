@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
 import { OverlayLayout } from '../layouts/OverlayLayout';
@@ -22,9 +23,19 @@ import type { OverlayLocationState } from './routeUtils';
 import { ProtectedRoute } from './ProtectedRoute';
 import DashboardLayout from '../components/DashboardLayout';
 import Dashboard from '../pages/Admin/Dashboard';
+import Login from '../pages/Login';
+import { useMeQuery } from '../features/auth/authQuerySlice';
+import { logout, syncUser } from '../features/auth/authSlice';
+
+type AuthState = { auth: { isAuthenticated: boolean; user: { role: string } | null } };
 
 export function AppRoutes() {
   const location = useLocation();
+  const dispatch = useDispatch();
+  const { isAuthenticated, user } = useSelector((state: AuthState) => state.auth);
+  const { data: sessionUser, isLoading: isSessionLoading, isError: isSessionInvalid } = useMeQuery(undefined, {
+    skip: !isAuthenticated,
+  });
   const isOverlay = isOverlayPath(location.pathname);
   const background = (location.state as OverlayLocationState | null)?.backgroundLocation;
   const pageLocation = isOverlay ? background ?? { pathname: '/', search: '', hash: '' } : location;
@@ -33,9 +44,17 @@ export function AppRoutes() {
     if (!isOverlay) window.scrollTo({ top: 0, behavior: 'instant' });
   }, [location.pathname, isOverlay]);
 
+  useEffect(() => {
+    if (sessionUser) dispatch(syncUser(sessionUser));
+    if (isSessionInvalid) dispatch(logout());
+  }, [dispatch, isSessionInvalid, sessionUser]);
+
+  const hasValidSession = isAuthenticated && !isSessionInvalid;
+
   return (
     <>
       <Routes location={pageLocation}>
+        <Route path="login" element={<Login />} />
         <Route element={<MainLayout />}>
           <Route index element={<HomePage />} />
           <Route path="shop" element={<ShopPage />} />
@@ -50,14 +69,32 @@ export function AppRoutes() {
         <Route
           path="dashboard"
           element={
-            // Replace this with your authentication provider's session state.
-            <ProtectedRoute isAuthenticated={false} redirectTo="/">
+            <ProtectedRoute
+              isAuthenticated={hasValidSession}
+              isLoading={isAuthenticated && isSessionLoading}
+              userRole={user?.role}
+              allowedRoles={['ADMIN', 'STAFF']}
+            >
               <DashboardLayout />
             </ProtectedRoute>
           }
         >
           <Route index element={<Dashboard />} />
-          <Route path="dashboard" element={<NotFoundPage />} />
+        </Route>
+        <Route
+          path="admin/dashboard"
+          element={
+            <ProtectedRoute
+              isAuthenticated={hasValidSession}
+              isLoading={isAuthenticated && isSessionLoading}
+              userRole={user?.role}
+              allowedRoles={['ADMIN']}
+            >
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Dashboard />} />
         </Route>
       </Routes>
       {isOverlay && (
