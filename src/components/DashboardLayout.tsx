@@ -131,7 +131,7 @@ export default function DashboardLayout() {
           </main>
         </div>
       </div>
-      <DefaultModal />
+      {user?.role === 'ADMIN' && <DefaultModal />}
     </div>
   );
 }
