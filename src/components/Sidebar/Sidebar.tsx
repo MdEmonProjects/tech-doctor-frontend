@@ -11,6 +11,7 @@ import {
 } from '../../features/ui/uiSlice';
 import SvgIcon from '../icons/SvgIcon.tsx';
 import { menuData } from './data';
+import { hasPermission } from '../../features/auth/permissions';
 import type { AppDispatch, RootState } from '../../app/store';
 
 export default function Sidebar() {
@@ -18,10 +19,23 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useSelector((state: RootState) => state.auth.user);
+  const visibleMenu = menuData.map((item) => ({
+    ...item,
+    subMenu: Array.isArray(item.subMenu) ? item.subMenu.filter((child) => !child.permission || hasPermission(user, child.permission)) : item.subMenu,
+  })).filter((item) => (!item.permission || hasPermission(user, item.permission)) && (!Array.isArray(item.subMenu) || item.subMenu.length > 0));
   const { mobileSidebarOpen, sidebarCollapsed, sidebarWidth, isResizingSidebar } = useSelector(
     (state: RootState) => state.ui
   );
   const [menuOpen, setMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const dismiss = (event: PointerEvent) => { if (!userMenuRef.current?.contains(event.target as Node)) setMenuOpen(false); };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('pointerdown', dismiss);
+    document.addEventListener('keydown', escape);
+    return () => { document.removeEventListener('pointerdown', dismiss); document.removeEventListener('keydown', escape); };
+  }, [menuOpen]);
   const [openSubmenuId, setOpenSubmenuId] = useState(() => {
     const activeParent = menuData.find((item) =>
       Array.isArray(item.subMenu) &&
@@ -138,7 +152,7 @@ export default function Sidebar() {
       </div> */}
 
       <nav className="mt-1 min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
-        {menuData.map((item) => {
+        {visibleMenu.map((item) => {
           const hasSubmenu = Array.isArray(item.subMenu) && item.subMenu.length > 0;
           const isSubmenuOpen = openSubmenuId === item.id;
           const hasActiveChild = Array.isArray(item.subMenu) && item.subMenu.some(
@@ -190,7 +204,7 @@ export default function Sidebar() {
                       onClick={() => dispatch(closeUiMobileSidebar())}
                       className={({ isActive }) => `flex items-center gap-3 rounded-lg px-2.5 py-2 text-[18px] ${isActive ? 'bg-white font-medium text-gray-900' : 'text-gray-600 hover:bg-gray-100'}`}
                     >
-                      <SvgIcon name={subItem.icon} />
+                      {subItem.icon && <SvgIcon name={subItem.icon} />}
                       <span>{subItem.name}</span>
                     </NavLink>
                   ))}
@@ -224,19 +238,25 @@ export default function Sidebar() {
         ))} */}
       </nav>
 
-      <div className="relative m-2 mt-0">
-        <div
+      <div ref={userMenuRef} className="relative m-2 mt-0">
+        <button
+          type="button"
+          aria-label="User menu"
+          aria-expanded={menuOpen}
           onClick={() => setMenuOpen((value) => !value)}
-          className={`flex cursor-pointer items-center gap-2.5 rounded-lg p-2 hover:bg-gray-100 ${sidebarCollapsed ? 'md:justify-center' : ''}`}
+          className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg p-2 text-left hover:bg-gray-100 ${sidebarCollapsed ? 'md:justify-center' : ''}`}
         >
           <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-clay text-xs font-semibold text-white">{initial}</div>
           <div className={`min-w-0 flex-1 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
             <p className="truncate text-sm font-medium text-gray-900">{user?.name}</p>
             <p className="truncate text-xs text-gray-500">{user?.email}</p>
           </div>
-        </div>
+        </button>
         {menuOpen && (
           <div className="absolute bottom-full left-0 mb-1 w-full min-w-[160px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+            {hasPermission(user, 'users.view') && <NavLink to="/dashboard/users/accounts" onClick={() => setMenuOpen(false)} className="block px-3.5 py-2.5 text-sm text-gray-800 hover:bg-gray-50">Manage users</NavLink>}
+            {hasPermission(user, 'roles.view') && <NavLink to="/dashboard/users/roles" onClick={() => setMenuOpen(false)} className="block px-3.5 py-2.5 text-sm text-gray-800 hover:bg-gray-50">Roles</NavLink>}
+            {hasPermission(user, 'permissions.view') && <NavLink to="/dashboard/users/permissions" onClick={() => setMenuOpen(false)} className="block px-3.5 py-2.5 text-sm text-gray-800 hover:bg-gray-50">Permissions</NavLink>}
             <button onClick={handleLogout} className="w-full px-3.5 py-2.5 text-left text-sm text-gray-800 hover:bg-gray-50">Log out</button>
           </div>
         )}

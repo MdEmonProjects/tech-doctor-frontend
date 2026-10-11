@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import { ArrowLeft, Pencil, Plus, Trash2, Wrench } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import type { RootState } from '../../app/store';
+import { hasPermission } from '../../features/auth/permissions';
 import CatalogDialog from '../../components/CatalogDialog';
 import RepairServiceDialog, { catalogError } from '../../components/RepairServiceDialog';
 import {
@@ -26,6 +27,11 @@ function ModelForm({ brand, model, onSaved, onCancel }: {
   onSaved: () => void;
   onCancel: () => void;
 }) {
+  const user = useSelector((state: RootState) => state.auth.user);
+  const canSaveModel = hasPermission(user, model ? 'catalog.models.update' : 'catalog.models.create');
+  const canCreateService = hasPermission(user, 'catalog.services.create');
+  const canUpdateService = hasPermission(user, 'catalog.services.update');
+  const canDeleteService = hasPermission(user, 'catalog.services.delete');
   const [name, setName] = useState(model?.name ?? '');
   const [deviceType, setDeviceType] = useState(model?.deviceType ?? 'Phone');
   const [selected, setSelected] = useState<Record<number, string>>(() => Object.fromEntries(
@@ -61,7 +67,7 @@ function ModelForm({ brand, model, onSaved, onCancel }: {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (saving) return;
+    if (saving || !canSaveModel) return;
     if (!name.trim()) { setError('Enter a model name.'); return; }
     const entries = Object.entries(selected);
     for (const [, price] of entries) {
@@ -108,13 +114,13 @@ function ModelForm({ brand, model, onSaved, onCancel }: {
 
   return <>
     <div className="mb-5">
-      <p className="text-sm font-semibold text-clay">{model ? 'Edit model' : 'Add model'}</p>
-      <h2 className="text-lg font-semibold text-foreground">{model ? model.name : `Services for a ${brand.name} model`}</h2>
-      <p className="mt-1 text-sm text-muted">Choose the repairs you provide and set a price for each service.</p>
+      <p className="text-sm font-semibold text-clay">{canSaveModel ? model ? 'Edit model' : 'Add model' : 'Repair services'}</p>
+      <h2 className="text-lg font-semibold text-foreground">{canSaveModel ? model ? model.name : `Services for a ${brand.name} model` : 'Available services'}</h2>
+      <p className="mt-1 text-sm text-muted">{canSaveModel ? 'Choose the repairs you provide and set a price for each service.' : 'Manage the shared services allowed by your role.'}</p>
     </div>
     <form onSubmit={submit} className="space-y-4">
       <fieldset disabled={saving} className="space-y-4 disabled:opacity-60">
-        <label className="block text-sm font-semibold text-slate-700">
+        {canSaveModel && <><label className="block text-sm font-semibold text-slate-700">
           Model name *
           <input value={name} onChange={(event) => setName(event.target.value)} maxLength={160} required className={inputClass} placeholder="e.g. Galaxy S24 Ultra" />
         </label>
@@ -124,14 +130,15 @@ function ModelForm({ brand, model, onSaved, onCancel }: {
             {deviceTypes.map((type) => <option key={type}>{type}</option>)}
           </select>
         </label>
+        </>}
         <div>
           <div className="mb-2 flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-700">Available services</h3>
-            <button type="button" onClick={() => { setEditingService(null); setServiceDialog(true); }} className="inline-flex items-center gap-1 text-sm font-semibold text-clay hover:underline">
+            {canCreateService && <button type="button" onClick={() => { setEditingService(null); setServiceDialog(true); }} className="inline-flex items-center gap-1 text-sm font-semibold text-clay hover:underline">
               <Plus size={15} />New service
-            </button>
+            </button>}
           </div>
-          <p className="mb-3 text-xs text-muted">Missing a repair? Add it here, then select it below. Leave its price blank when a quote is needed.</p>
+          <p className="mb-3 text-xs text-muted">{canSaveModel ? canCreateService ? 'Missing a repair? Add it here, then select it below. Leave its price blank when a quote is needed.' : 'Select the repairs offered for this model. Ask a service manager to add any missing repairs.' : 'Service changes apply to every model using the service.'}</p>
           {notice && <p role="status" className="mb-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">{notice}</p>}
           <div className="max-h-80 space-y-2 overflow-y-auto rounded-lg border border-slate-200 p-3">
             {isLoading ? <p role="status" className="text-sm text-muted">Loading services…</p>
@@ -139,19 +146,19 @@ function ModelForm({ brand, model, onSaved, onCancel }: {
               : services.length ? services.map((service) => <div key={service.id} id={`service-option-${service.id}`} className={`rounded-lg p-2.5 ${recentServiceId === service.id ? 'bg-green-50 ring-1 ring-green-200' : 'bg-slate-50'}`}>
                 <div className="flex items-start justify-between gap-2">
                   <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2 text-sm text-slate-800">
-                    <input type="checkbox" checked={Object.hasOwn(selected, service.id)} onChange={() => toggle(service.id)} className="mt-0.5 size-4 shrink-0 accent-clay" />
+                    {canSaveModel && <input type="checkbox" checked={Object.hasOwn(selected, service.id)} onChange={() => toggle(service.id)} className="mt-0.5 size-4 shrink-0 accent-clay" />}
                     <span>{service.name}</span>
                   </label>
                   <div className="flex shrink-0 gap-1">
-                    <button type="button" onClick={() => { setEditingService(service); setServiceDialog(true); }} aria-label={`Edit service ${service.name}`} className="rounded p-1 text-muted hover:bg-white hover:text-clay"><Pencil size={14} /></button>
-                    <button type="button" onClick={() => { setDeleteError(null); setDeleteTarget(service); }} aria-label={`Remove service ${service.name}`} className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+                    {canUpdateService && <button type="button" onClick={() => { setEditingService(service); setServiceDialog(true); }} aria-label={`Edit service ${service.name}`} className="rounded p-1 text-muted hover:bg-white hover:text-clay"><Pencil size={14} /></button>}
+                    {canDeleteService && <button type="button" onClick={() => { setDeleteError(null); setDeleteTarget(service); }} aria-label={`Remove service ${service.name}`} className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>}
                   </div>
                 </div>
-                {Object.hasOwn(selected, service.id) && <label className="mt-2 flex items-center justify-between gap-3 text-xs text-muted">
+                {canSaveModel && Object.hasOwn(selected, service.id) && <label className="mt-2 flex items-center justify-between gap-3 text-xs text-muted">
                   Price for this model
                   <input aria-label={`${service.name} price`} type="number" min="0" max="99999999.99" step="0.01" value={selected[service.id]} onChange={(event) => setSelected((current) => ({ ...current, [service.id]: event.target.value }))} placeholder="Quote" className="h-9 w-28 rounded-lg border border-slate-300 bg-white px-2 text-sm text-slate-900" />
                 </label>}
-              </div>) : <p className="text-sm text-muted">No services yet. Click New service to add your first repair.</p>}
+              </div>) : <p className="text-sm text-muted">{canCreateService ? 'No services yet. Click New service to add your first repair.' : 'No services available yet.'}</p>}
             {unavailableIds.map((id) => <div key={id} className="flex items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
               <span>A selected service is no longer available.</span>
               <button type="button" onClick={() => toggle(id)} className="font-semibold underline">Remove</button>
@@ -161,22 +168,22 @@ function ModelForm({ brand, model, onSaved, onCancel }: {
         </div>
       </fieldset>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-      <div className="flex gap-2">
+      {canSaveModel && <div className="flex gap-2">
         {model && <button type="button" disabled={saving} onClick={onCancel} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 disabled:opacity-60">Cancel</button>}
         <button type="submit" disabled={saving || isLoading || isError || unavailableIds.length > 0} className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-clay px-4 py-2.5 text-sm font-semibold text-white hover:bg-clay-dark disabled:opacity-60">
           {!model && <Plus size={16} />}{saving ? 'Saving…' : model ? 'Save changes' : 'Save model & services'}
         </button>
-      </div>
+      </div>}
     </form>
-    {serviceDialog && <RepairServiceDialog
+    {serviceDialog && (editingService ? canUpdateService : canCreateService) && <RepairServiceDialog
       service={editingService ?? undefined}
       onClose={() => setServiceDialog(false)}
       onSaved={(saved) => {
         setRecentServiceId(saved.id);
-        setNotice(editingService ? `${saved.name} updated.` : `${saved.name} is now available. Select it and enter its price below.`);
+        setNotice(editingService ? `${saved.name} updated.` : canSaveModel ? `${saved.name} is now available. Select it and enter its price below.` : `${saved.name} added.`);
       }}
     />}
-    {deleteTarget && <CatalogDialog title="Remove repair service?" onClose={() => !deletingService && setDeleteTarget(null)}>
+    {canDeleteService && deleteTarget && <CatalogDialog title="Remove repair service?" onClose={() => !deletingService && setDeleteTarget(null)}>
       <p className="text-sm text-slate-600"><strong>{deleteTarget.name}</strong> will be removed from the available services and every model using it. Other model details you entered will be kept.</p>
       {deleteError && <p role="alert" className="mt-3 text-sm text-red-600">{deleteError}</p>}
       <div className="mt-6 flex justify-end gap-3">
@@ -188,11 +195,16 @@ function ModelForm({ brand, model, onSaved, onCancel }: {
 }
 
 function BrandWorkspace({ brand }: { brand: CatalogBrand }) {
-  const canManage = useSelector((state: RootState) => state.auth.user?.role === 'ADMIN');
+  const user = useSelector((state: RootState) => state.auth.user);
   const [editingModel, setEditingModel] = useState<CatalogModel | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CatalogModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleteModel, { isLoading: deleting }] = useDeleteRepairModelMutation();
+  const canEditModel = hasPermission(user, 'catalog.models.update');
+  const canDeleteModel = hasPermission(user, 'catalog.models.delete');
+  const canManage = hasPermission(user, 'catalog.models.create') || (editingModel !== null && canEditModel)
+    || ['catalog.services.create', 'catalog.services.update', 'catalog.services.delete'].some((key) => hasPermission(user, key));
+  useEffect(() => { if (editingModel) document.getElementById('model-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, [editingModel]);
   const confirmDelete = async () => {
     if (!deleteTarget || deleting) return;
     try {
@@ -217,10 +229,8 @@ function BrandWorkspace({ brand }: { brand: CatalogBrand }) {
               <h2 className="font-semibold text-foreground">{model.name}</h2>
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">{model.deviceType}</span>
-                {canManage && <>
-                <button type="button" onClick={() => { setEditingModel(model); document.getElementById('model-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} aria-label={`Edit model ${model.name}`} className="rounded-lg border border-border p-2 text-foreground hover:bg-slate-50"><Pencil size={17} /></button>
-                <button type="button" onClick={() => { setError(null); setDeleteTarget(model); }} aria-label={`Remove model ${model.name}`} className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50"><Trash2 size={17} /></button>
-                </>}
+                {canEditModel && <button type="button" onClick={() => setEditingModel(model)} aria-label={`Edit model ${model.name}`} className="rounded-lg border border-border p-2 text-foreground hover:bg-slate-50"><Pencil size={17} /></button>}
+                {canDeleteModel && <button type="button" onClick={() => { setError(null); setDeleteTarget(model); }} aria-label={`Remove model ${model.name}`} className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50"><Trash2 size={17} /></button>}
               </div>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -235,7 +245,7 @@ function BrandWorkspace({ brand }: { brand: CatalogBrand }) {
         <ModelForm key={editingModel?.id ?? 'new'} brand={brand} model={editingModel ?? undefined} onSaved={() => setEditingModel(null)} onCancel={() => setEditingModel(null)} />
       </aside>}
     </div>
-    {canManage && deleteTarget && <CatalogDialog title="Remove model?" onClose={() => !deleting && setDeleteTarget(null)}>
+    {canDeleteModel && deleteTarget && <CatalogDialog title="Remove model?" onClose={() => !deleting && setDeleteTarget(null)}>
       <p className="text-sm text-slate-600"><strong>{deleteTarget.name}</strong> and its repair options will disappear from the active catalog.</p>
       {error && <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>}
       <div className="mt-6 flex justify-end gap-3">

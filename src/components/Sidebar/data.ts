@@ -4,15 +4,24 @@ export interface SidebarMenuItem {
   route: string;
   icon: string;
   subMenu: SidebarMenuItem[] | false;
+  permission?: string;
 }
 
 export const menuData: SidebarMenuItem[] = [
-  { id: '1', name: 'Dashboard', route: 'dashboard', icon: 'Dashboard', subMenu: false },
+  { id: '1', name: 'Dashboard', route: '', icon: 'Dashboard', subMenu: false },
   {
     id: '2', name: 'Repair & Service', route: 'repair-service', icon: 'UserPlus',
     subMenu: [
-      { id: '22', name: 'Repair Tracking', route: 'repair-tracking', icon: '', subMenu: false },
-      { id: '21', name: 'Brands & Services', route: 'brands-services', icon: '', subMenu: false },
+      { id: '22', name: 'Repair Tracking', route: 'repair-tracking', icon: '', subMenu: false, permission: 'catalog.view' },
+      { id: '21', name: 'Brands & Services', route: 'brands-services', icon: '', subMenu: false, permission: 'catalog.view' },
+    ],
+  },
+  {
+    id: 'users', name: 'Users', route: 'users', icon: 'UserPlus',
+    subMenu: [
+      { id: 'users-accounts', name: 'All users', route: 'accounts', icon: '', subMenu: false, permission: 'users.view' },
+      { id: 'users-roles', name: 'Roles', route: 'roles', icon: '', subMenu: false, permission: 'roles.view' },
+      { id: 'users-permissions', name: 'Permissions', route: 'permissions', icon: '', subMenu: false, permission: 'permissions.view' },
     ],
   },
   // {

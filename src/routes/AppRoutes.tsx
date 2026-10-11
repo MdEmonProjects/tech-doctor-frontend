@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
@@ -28,16 +28,26 @@ import RepairBrandModels from '../pages/Admin/RepairBrandModels';
 import Login from '../pages/Login';
 import { useMeQuery } from '../features/auth/authQuerySlice';
 import { logout, syncUser } from '../features/auth/authSlice';
-
-type AuthState = { auth: { isAuthenticated: boolean; user: { role: string } | null } };
+import type { RootState } from '../app/store';
+import PermissionRoute from './PermissionRoute';
+import Users from '../pages/Admin/Users';
+import Roles from '../pages/Admin/Roles';
+import Permissions from '../pages/Admin/Permissions';
+import { accessApi } from '../features/access/accessApi';
+import type { AppDispatch } from '../app/store';
 
 export function AppRoutes() {
   const location = useLocation();
-  const dispatch = useDispatch();
-  const { isAuthenticated, user } = useSelector((state: AuthState) => state.auth);
-  const { data: sessionUser, isLoading: isSessionLoading, isError: isSessionInvalid } = useMeQuery(undefined, {
+  const dispatch = useDispatch<AppDispatch>();
+  const sessionAccess = useRef<string | null>(null);
+  const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
+  const { data: sessionUser, isLoading: isSessionLoading, error: sessionError } = useMeQuery(undefined, {
     skip: !isAuthenticated,
+    pollingInterval: 30000,
+    refetchOnFocus: true,
+    refetchOnMountOrArgChange: true,
   });
+  const isSessionInvalid = Boolean(sessionError && 'status' in sessionError && sessionError.status === 401);
   const isOverlay = isOverlayPath(location.pathname);
   const background = (location.state as OverlayLocationState | null)?.backgroundLocation;
   const pageLocation = isOverlay ? background ?? { pathname: '/', search: '', hash: '' } : location;
@@ -47,7 +57,14 @@ export function AppRoutes() {
   }, [location.pathname, isOverlay]);
 
   useEffect(() => {
-    if (sessionUser) dispatch(syncUser(sessionUser));
+    if (sessionUser) {
+      const signature = JSON.stringify([sessionUser.roleId, sessionUser.permissions]);
+      if (sessionAccess.current !== signature) {
+        sessionAccess.current = signature;
+        dispatch(accessApi.util.invalidateTags(['Access']));
+      }
+      dispatch(syncUser(sessionUser));
+    }
     if (isSessionInvalid) dispatch(logout());
   }, [dispatch, isSessionInvalid, sessionUser]);
 
@@ -75,15 +92,19 @@ export function AppRoutes() {
               isAuthenticated={hasValidSession}
               isLoading={isAuthenticated && isSessionLoading}
               userRole={user?.role}
-              allowedRoles={['ADMIN', 'STAFF']}
             >
               <DashboardLayout />
             </ProtectedRoute>
           }
         >
           <Route index element={<Dashboard />} />
-          <Route path="repair-service/brands-services" element={<RepairBrandsServices />} />
-          <Route path="repair-service/brands-services/:brandId" element={<RepairBrandModels />} />
+          <Route element={<PermissionRoute permission="catalog.view" />}>
+            <Route path="repair-service/brands-services" element={<RepairBrandsServices />} />
+            <Route path="repair-service/brands-services/:brandId" element={<RepairBrandModels />} />
+          </Route>
+          <Route element={<PermissionRoute permission="users.view" />}><Route path="users/accounts" element={<Users />} /></Route>
+          <Route element={<PermissionRoute permission="roles.view" />}><Route path="users/roles" element={<Roles />} /></Route>
+          <Route element={<PermissionRoute permission="permissions.view" />}><Route path="users/permissions" element={<Permissions />} /></Route>
         </Route>
         <Route
           path="admin/dashboard"

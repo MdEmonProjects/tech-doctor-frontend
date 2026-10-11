@@ -15,6 +15,7 @@ const API_URL = import.meta.env?.VITE_API_URL ?? 'http://localhost:3002';
 
 export const authQuerySlice = createApi({
   reducerPath: 'authApi',
+  tagTypes: ['Session'],
   baseQuery: fetchBaseQuery({
     baseUrl: `${API_URL}/api`,
     prepareHeaders: (headers) => {
@@ -26,8 +27,9 @@ export const authQuerySlice = createApi({
   endpoints: (builder) => ({
     login: builder.mutation<LoginResponse, LoginRequest>({
       query: (body) => ({ url: '/auth/login', method: 'POST', body }),
+      invalidatesTags: ['Session'],
     }),
-    me: builder.query<AuthUser, void>({ query: () => '/auth/me' }),
+    me: builder.query<AuthUser, void>({ query: () => '/auth/me', providesTags: ['Session'] }),
   }),
 });
 

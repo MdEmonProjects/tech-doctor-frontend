@@ -10,7 +10,7 @@ export default function Dashboard() {
       <p className="text-sm font-medium uppercase tracking-wider text-clay">{user?.role} workspace</p>
       <h1 className="mt-2 text-3xl font-semibold tracking-tight">Welcome, {user?.name || user?.email}</h1>
       <p className="mt-3 max-w-2xl text-slate-600">
-        Your session is authenticated and your role has been verified. Role-specific tools can be added here safely.
+        Use the menu to open the tools allowed by your assigned role. An administrator can update your access from Users and Roles.
       </p>
     </section>
   );

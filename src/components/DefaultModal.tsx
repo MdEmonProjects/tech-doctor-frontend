@@ -4,13 +4,16 @@ import { closeModal } from '../features/modal/modalSlice';
 import type { AppDispatch, RootState } from '../app/store';
 import AddRepairDevice from './AddRepairDevice';
 import AddRepairBrand from './AddRepairBrand';
+import { hasPermission } from '../features/auth/permissions';
 
 export default function DefaultModal() {
   const dispatch = useDispatch<AppDispatch>();
   const { isOpen, title, modalType } = useSelector((state: RootState) => state.modal);
+  const user = useSelector((state: RootState) => state.auth.user);
+  const allowed = modalType === 'ADD_REPAIR_BRAND' ? hasPermission(user, 'catalog.brands.create') : user?.role === 'ADMIN';
   return (
     <AnimatePresence>
-      {isOpen && (
+      {isOpen && allowed && (
         <motion.div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/45 sm:items-center sm:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={(event) => event.target === event.currentTarget && dispatch(closeModal())}>
           <motion.div role="dialog" aria-modal="true" aria-label={title} className="w-full max-w-2xl overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }}>
             <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4">

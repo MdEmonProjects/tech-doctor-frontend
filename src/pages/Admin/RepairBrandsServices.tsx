@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import SortableTable, { type SortableTableColumn } from '../../components/SortableTable';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../app/store';
+import { hasPermission } from '../../features/auth/permissions';
 import { useGetRepairCatalogQuery } from '../../features/repairCatalog/repairCatalogApi';
 import { showModal } from '../../utils/ModalControlar';
 
@@ -17,7 +18,7 @@ const columns: SortableTableColumn<BrandRow>[] = [
 ];
 
 export default function RepairBrandsServices() {
-  const canManage = useSelector((state: RootState) => state.auth.user?.role === 'ADMIN');
+  const canManage = useSelector((state: RootState) => hasPermission(state.auth.user, 'catalog.brands.create'));
   const [search, setSearch] = useState('');
   const { data: catalog = [], isLoading, isError } = useGetRepairCatalogQuery();
   const rows = useMemo<BrandRow[]>(() => catalog.map((brand) => ({
