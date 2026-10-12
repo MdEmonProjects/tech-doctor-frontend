@@ -9,10 +9,11 @@ export interface SidebarMenuItem {
 
 export const menuData: SidebarMenuItem[] = [
   { id: '1', name: 'Dashboard', route: '', icon: 'Dashboard', subMenu: false },
+  { id: 'branches', name: 'Branches', route: 'branches', icon: 'LuWarehouse', subMenu: false, permission: 'branches.view' },
   {
     id: '2', name: 'Repair & Service', route: 'repair-service', icon: 'UserPlus',
     subMenu: [
-      { id: '22', name: 'Repair Tracking', route: 'repair-tracking', icon: '', subMenu: false, permission: 'catalog.view' },
+      { id: '22', name: 'Repair Tracking', route: 'repair-tracking', icon: '', subMenu: false, permission: 'repairs.view' },
       { id: '21', name: 'Brands & Services', route: 'brands-services', icon: '', subMenu: false, permission: 'catalog.view' },
     ],
   },

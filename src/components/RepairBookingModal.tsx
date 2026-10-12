@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { DEVICE_CATALOG, REPAIR_SERVICES, REPAIR_PRICE_ESTIMATES } from '../data/mockData';
 import { X, CheckCircle, Wrench, ShieldCheck, Clock } from 'lucide-react';
+import { useCreateRepairMutation, useGetRepairBranchesQuery } from '../features/repairs/repairsApi';
+import { catalogError } from './RepairServiceDialog';
 
 interface RepairBookingModalProps {
   isOpen: boolean;
@@ -23,6 +25,10 @@ export const RepairBookingModal: React.FC<RepairBookingModalProps> = ({
   const [bookingRef, setBookingRef] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [branchId, setBranchId] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const { data: branches = [] } = useGetRepairBranchesQuery();
+  const [createRepair] = useCreateRepairMutation();
 
   if (!isOpen) return null;
 
@@ -38,20 +44,27 @@ export const RepairBookingModal: React.FC<RepairBookingModalProps> = ({
   const estimatedPrice = getEstimatedPrice();
   const selectedServiceObj = REPAIR_SERVICES.find((s) => s.title === repairType) || REPAIR_SERVICES[0];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !phone) return;
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      const generatedRef = `TD-${Math.floor(100000 + Math.random() * 900000)}`;
-      setBookingRef(generatedRef);
+    setSubmitError(null);
+    try {
+      const repair = await createRepair({
+        customerName: name.trim(), phone: phone.trim(), brand, model, service: repairType,
+        ...(branchId ? { branchId: Number(branchId) } : {}),
+      }).unwrap();
+      setBookingRef(repair.ticketId);
       setIsSubmitting(false);
       setIsSuccess(true);
       if (onSuccessToast) {
-        onSuccessToast(`Repair booking #${generatedRef} confirmed!`);
+        onSuccessToast(`Repair request #${repair.ticketId} submitted with Pending status.`);
       }
-    }, 900);
+    } catch (failure) {
+      setSubmitError(catalogError(failure));
+      setIsSubmitting(false);
+    }
   };
 
   const handleResetAndClose = () => {
@@ -92,12 +105,12 @@ export const RepairBookingModal: React.FC<RepairBookingModalProps> = ({
               <div className="w-14 h-14 bg-[#D4AF37]/10 text-[#D4AF37] rounded-full flex items-center justify-center mx-auto border border-[#D4AF37]/40">
                 <CheckCircle className="w-7 h-7" />
               </div>
-              <h4 className="text-xl font-light text-white">Appointment Scheduled</h4>
+              <h4 className="text-xl font-light text-white">Repair Request Submitted</h4>
               <p className="text-xs text-neutral-400">
                 Confirmation Number: <strong className="text-[#D4AF37] font-mono">{bookingRef}</strong>
               </p>
               <p className="text-xs text-neutral-400 max-w-xs mx-auto">
-                Please bring your {brand} {model} to our flagship atelier desk. No prepayment is needed.
+                Your request is Pending. Keep this ticket number and use the tracking page for updates.
               </p>
 
               <div className="pt-3">
@@ -160,6 +173,14 @@ export const RepairBookingModal: React.FC<RepairBookingModalProps> = ({
                 </select>
               </div>
 
+              {branches.length > 0 && <div>
+                <label className="block text-[11px] font-medium text-neutral-400 mb-1">Preferred Branch</label>
+                <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="w-full bg-[#161616] border border-white/10 rounded-xs px-3 py-2 text-xs text-white focus:outline-none focus:border-[#D4AF37]">
+                  <option value="" className="bg-[#111]">Choose later</option>
+                  {branches.map((branch) => <option key={branch.id} value={branch.id} className="bg-[#111]">{branch.name} — {branch.location}</option>)}
+                </select>
+              </div>}
+
               {/* Estimate Pill */}
               <div className="p-3 bg-[#151515] border border-[#D4AF37]/30 rounded-xs flex items-center justify-between text-xs">
                 <div>
@@ -200,6 +221,7 @@ export const RepairBookingModal: React.FC<RepairBookingModalProps> = ({
               </div>
 
               <div className="pt-2">
+                {submitError && <p role="alert" className="mb-3 text-xs text-red-400">{submitError}</p>}
                 <button
                   type="submit"
                   disabled={isSubmitting}

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useGetRepairCatalogQuery } from '../features/repairCatalog/repairCatalogApi';
+import { useCreateRepairMutation, useGetRepairBranchesQuery } from '../features/repairs/repairsApi';
+import { catalogError } from './RepairServiceDialog';
 import { 
   Wrench, 
   CheckCircle, 
@@ -36,6 +38,10 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
   const [phone, setPhone] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [branchId, setBranchId] = useState<string>('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const { data: branches = [] } = useGetRepairBranchesQuery();
+  const [createRepair] = useCreateRepairMutation();
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
@@ -74,20 +80,28 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
     if (!availableServices.some((entry) => entry.id === serviceLinkId)) setServiceLinkId(initial?.id ?? availableServices[0].id);
   }, [availableServices, initialService, serviceLinkId]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !phone || !selectedBrand || !selectedModel || !selectedServiceLink) return;
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      const generatedRef = `TD-${Math.floor(100000 + Math.random() * 900000)}`;
-      setBookingRef(generatedRef);
+    setSubmitError(null);
+    try {
+      const repair = await createRepair({
+        customerName: name.trim(), phone: phone.trim(), email: email.trim() || undefined,
+        brand, model, service: repairType, serviceMode, preferredDate, preferredTime,
+        notes: notes.trim() || undefined, ...(branchId ? { branchId: Number(branchId) } : {}),
+      }).unwrap();
+      setBookingRef(repair.ticketId);
       setIsSubmitting(false);
       setIsSuccess(true);
       if (onSuccessToast) {
-        onSuccessToast(`Repair reservation #${generatedRef} successfully booked!`);
+        onSuccessToast(`Repair request #${repair.ticketId} submitted with Pending status.`);
       }
-    }, 1000);
+    } catch (failure) {
+      setSubmitError(catalogError(failure));
+      setIsSubmitting(false);
+    }
   };
 
   const handleReset = () => {
@@ -96,6 +110,7 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
     setPhone('');
     setEmail('');
     setNotes('');
+    setBranchId('');
   };
 
   return (
@@ -128,10 +143,10 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
 
               <div className="space-y-2">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#D4AF37] font-mono">
-                  PRIORITY APPOINTMENT RESERVED
+                  REPAIR REQUEST RECEIVED
                 </span>
                 <h3 className="text-2xl sm:text-3xl font-light text-white">
-                  We Have Reserved Your Repair Slot
+                  Your Repair Is Pending Review
                 </h3>
                 <p className="text-xs text-white/50 max-w-md mx-auto">
                   Booking Confirmation Number:{' '}
@@ -337,6 +352,13 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
                   </button>
                 </div>
 
+                {branches.length > 0 && serviceMode === 'in-store' && <div>
+                  <label className="block text-[11px] font-medium text-white/50 mb-1">Preferred Branch</label>
+                  <select value={branchId} onChange={(event) => setBranchId(event.target.value)} className="w-full bg-[#151515] border border-white/10 rounded-sm px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#D4AF37]">
+                    <option value="">Choose later</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} — {branch.location}</option>)}
+                  </select>
+                </div>}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                   <div>
                     <label className="block text-[11px] font-medium text-white/50 mb-1">
@@ -366,6 +388,7 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
                     </select>
                   </div>
                 </div>
+                <textarea rows={3} maxLength={5000} placeholder="Anything else our technician should know? (optional)" value={notes} onChange={(event) => setNotes(event.target.value)} className="w-full bg-[#151515] border border-white/10 rounded-sm px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#D4AF37]" />
               </div>
 
               {/* Step 4: Customer Details */}
@@ -418,14 +441,14 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
                   <span>No payment required now. Pay only after inspection.</span>
                 </div>
 
-                <button
+                <div className="w-full sm:w-auto">{submitError && <p role="alert" className="mb-2 text-xs text-red-400">{submitError}</p>}<button
                   type="submit"
                   disabled={isSubmitting || !selectedServiceLink}
                   className="w-full sm:w-auto bg-[#D4AF37] hover:bg-[#C19A2F] disabled:bg-neutral-800 text-black font-semibold text-xs tracking-wider uppercase px-8 py-3.5 rounded-sm shadow-xl transition-all flex items-center justify-center space-x-2 cursor-pointer"
                 >
                   <Wrench className="w-4 h-4 text-black" />
                   <span>{isSubmitting ? 'Reserving...' : 'CONFIRM BENCH RESERVATION'}</span>
-                </button>
+                </button></div>
               </div>
 
             </form>

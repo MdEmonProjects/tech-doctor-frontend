@@ -14,6 +14,8 @@ import Roles from '../src/pages/Admin/Roles';
 import Permissions from '../src/pages/Admin/Permissions';
 import PermissionRoute from '../src/routes/PermissionRoute';
 import Sidebar from '../src/components/Sidebar/Sidebar';
+import Branches from '../src/pages/Admin/Branches';
+import { branchesApi } from '../src/features/branches/branchesApi';
 
 const actor = (role: string, permissions: string[]) => store.dispatch(loginSuccess({ accessToken: 'test-only', user: { id: 1, name: 'Tester', email: 'tester@example.invalid', role, roleId: 1, roleName: role, permissions } }));
 const render = (element: React.ReactNode, path = '/') => renderToStaticMarkup(<Provider store={store}><MemoryRouter initialEntries={[path]}>{element}</MemoryRouter></Provider>);
@@ -29,6 +31,7 @@ try {
   await store.dispatch(accessApi.util.upsertQueryData('getRoles', undefined, [staffRole]));
   await store.dispatch(accessApi.util.upsertQueryData('getRolePermissions', undefined, [viewPermission]));
   await store.dispatch(accessApi.util.upsertQueryData('getPermissions', undefined, [viewPermission]));
+  await store.dispatch(branchesApi.util.upsertQueryData('getBranches', undefined, [{ id: 1, name: 'Dhanmondi Branch', code: 'DHK-01', location: 'Dhanmondi, Dhaka', googleMapUrl: 'https://maps.google.com/?q=Dhanmondi', openTime: '09:00', closeTime: '18:00', is24Hours: false, weeklyOffDays: ['Friday'], contactNumber: '+880 1700 000000', whatsappNumber: null, email: null, managerName: null, note: null, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }]));
   const models = <Routes><Route path="/brand/:brandId" element={<RepairBrandModels />} /></Routes>;
 
   actor('TECHNICIAN', ['catalog.view', 'catalog.models.create', 'catalog.services.create']);
@@ -59,9 +62,17 @@ try {
   actor('ADMIN', ['*']);
   assert.ok(render(guarded).includes('Role management allowed'), 'Protected administrators must retain access.');
   assert.ok(render(<Sidebar />, '/dashboard/users/accounts').includes('All users'), 'Administrators must see the Users menu.');
+  actor('BRANCH_VIEWER', ['branches.view']);
+  html = render(<Branches />);
+  assert.ok(html.includes('Dhanmondi Branch') && !html.includes('Add branch') && !html.includes('Set inactive') && !html.includes('>Delete<'), 'Branch viewers must see branch details without management actions.');
+  assert.ok(render(<Sidebar />, '/dashboard/branches').includes('Branches'), 'Branch viewers must see branch navigation.');
+  actor('BRANCH_MANAGER', ['branches.view', 'branches.create', 'branches.update', 'branches.status', 'branches.delete']);
+  html = render(<Branches />);
+  assert.ok(html.includes('Add branch') && html.includes('Edit') && html.includes('Set inactive') && html.includes('>Delete<'), 'Branch managers must receive each assigned CRUD and status action.');
   console.log('Access UI checks passed: custom roles, separate action permissions, view-only staff, menu visibility, and direct-page access.');
 } finally {
   store.dispatch(accessApi.util.resetApiState());
   store.dispatch(repairCatalogApi.util.resetApiState());
   store.dispatch(authQuerySlice.util.resetApiState());
+  store.dispatch(branchesApi.util.resetApiState());
 }

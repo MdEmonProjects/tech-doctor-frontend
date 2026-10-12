@@ -7,11 +7,15 @@ import uiReducer from '../features/ui/uiSlice';
 import modalReducer from '../features/modal/modalSlice';
 import { repairCatalogApi } from '../features/repairCatalog/repairCatalogApi';
 import { accessApi } from '../features/access/accessApi';
+import { branchesApi } from '../features/branches/branchesApi';
+import { repairsApi } from '../features/repairs/repairsApi';
 const sessionListener = createListenerMiddleware();
 sessionListener.startListening({ actionCreator: logout, effect: (_, { dispatch }) => {
   dispatch(authQuerySlice.util.resetApiState());
   dispatch(repairCatalogApi.util.resetApiState());
   dispatch(accessApi.util.resetApiState());
+  dispatch(branchesApi.util.resetApiState());
+  dispatch(repairsApi.util.resetApiState());
 } });
 export const store = configureStore({
   reducer: {
@@ -21,8 +25,10 @@ export const store = configureStore({
     [authQuerySlice.reducerPath]: authQuerySlice.reducer,
     [repairCatalogApi.reducerPath]: repairCatalogApi.reducer,
     [accessApi.reducerPath]: accessApi.reducer,
+    [branchesApi.reducerPath]: branchesApi.reducer,
+    [repairsApi.reducerPath]: repairsApi.reducer,
   },
-  middleware: (getDefaultMiddleware) => getDefaultMiddleware().prepend(sessionListener.middleware).concat(authQuerySlice.middleware, repairCatalogApi.middleware, accessApi.middleware),
+  middleware: (getDefaultMiddleware) => getDefaultMiddleware().prepend(sessionListener.middleware).concat(authQuerySlice.middleware, repairCatalogApi.middleware, accessApi.middleware, branchesApi.middleware, repairsApi.middleware),
 });
 if (typeof window !== 'undefined') setupListeners(store.dispatch);
 
