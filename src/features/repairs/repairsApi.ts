@@ -19,7 +19,17 @@ export const REPAIR_STATUS_LABELS: Record<RepairStatus, string> = {
 };
 
 export interface RepairBranchOption { id: number; name: string; code: string | null; location: string; }
-export interface RepairHistory { id: number; status: RepairStatus; note: string | null; createdAt: string; }
+export interface RepairStaff { id: number; name: string | null; email: string; }
+export interface RepairHistory {
+  id: number;
+  status: RepairStatus;
+  eventType?: 'STATUS' | 'DETAILS_UPDATED';
+  note: string | null;
+  changes?: { fields?: string[] } | null;
+  updatedById?: number | null;
+  updatedBy?: RepairStaff | null;
+  createdAt: string;
+}
 export interface RepairTicket {
   id: number;
   ticketId: string;
@@ -34,12 +44,15 @@ export interface RepairTicket {
   preferredDate?: string | null;
   preferredTime?: string | null;
   customerNotes?: string | null;
+  damageImages?: string[] | null;
   branch: RepairBranchOption | null;
   status: RepairStatus;
   statusNote: string | null;
   estimatedCompletion: string | null;
   createdAt: string;
   updatedAt: string;
+  lastUpdatedById?: number | null;
+  lastUpdatedBy?: RepairStaff | null;
   history: RepairHistory[];
 }
 
@@ -55,9 +68,35 @@ export interface CreateRepairInput {
   preferredDate?: string;
   preferredTime?: string;
   notes?: string;
+  images?: File[];
+}
+
+export interface UpdateRepairInput {
+  customerName: string;
+  phone: string;
+  email: string | null;
+  brand: string;
+  model: string;
+  service: string;
+  branchId: number | null;
+  serviceMode: 'in-store' | 'courier-pickup' | 'mail-in' | null;
+  preferredDate: string | null;
+  preferredTime: string | null;
+  customerNotes: string | null;
 }
 
 const API_URL = import.meta.env?.VITE_API_URL ?? 'http://localhost:3002';
+export const repairImageUrl = (repairId: number, imageName: string) => `${API_URL}/api/repairs/${repairId}/images/${encodeURIComponent(imageName)}`;
+
+function repairFormData(input: CreateRepairInput) {
+  const { images = [], ...fields } = input;
+  const form = new FormData();
+  Object.entries(fields).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) form.append(key, String(value));
+  });
+  images.forEach((image) => form.append('images', image));
+  return form;
+}
 
 export const repairsApi = createApi({
   reducerPath: 'repairsApi',
@@ -74,20 +113,25 @@ export const repairsApi = createApi({
   }),
   endpoints: (builder) => ({
     getRepairs: builder.query<RepairTicket[], void>({ query: () => '', providesTags: ['Repairs'] }),
+    getRepair: builder.query<RepairTicket, number>({ query: (id) => `/${id}`, providesTags: ['Repairs'] }),
     getRepairBranches: builder.query<RepairBranchOption[], void>({ query: () => '/branches' }),
     trackRepair: builder.query<RepairTicket, string>({ query: (ticketId) => `/track/${encodeURIComponent(ticketId)}` }),
     createRepair: builder.mutation<RepairTicket, CreateRepairInput>({
-      query: (body) => ({ url: '', method: 'POST', body }),
+      query: (body) => ({ url: '', method: 'POST', body: repairFormData(body) }),
       invalidatesTags: ['Repairs'],
     }),
     updateRepairStatus: builder.mutation<RepairTicket, { id: number; status: RepairStatus; note?: string; estimatedCompletion?: string }>({
       query: ({ id, ...body }) => ({ url: `/${id}/status`, method: 'PATCH', body }),
       invalidatesTags: ['Repairs'],
     }),
+    updateRepair: builder.mutation<RepairTicket, { id: number; body: UpdateRepairInput }>({
+      query: ({ id, body }) => ({ url: `/${id}`, method: 'PATCH', body }),
+      invalidatesTags: ['Repairs'],
+    }),
   }),
 });
 
 export const {
-  useGetRepairsQuery, useGetRepairBranchesQuery, useLazyTrackRepairQuery,
-  useCreateRepairMutation, useUpdateRepairStatusMutation,
+  useGetRepairsQuery, useGetRepairQuery, useGetRepairBranchesQuery, useLazyTrackRepairQuery,
+  useCreateRepairMutation, useUpdateRepairStatusMutation, useUpdateRepairMutation,
 } = repairsApi;

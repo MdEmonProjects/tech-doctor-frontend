@@ -16,6 +16,8 @@ import PermissionRoute from '../src/routes/PermissionRoute';
 import Sidebar from '../src/components/Sidebar/Sidebar';
 import Branches from '../src/pages/Admin/Branches';
 import { branchesApi } from '../src/features/branches/branchesApi';
+import RepairTracking from '../src/pages/Admin/RepairTracking';
+import { repairsApi } from '../src/features/repairs/repairsApi';
 
 const actor = (role: string, permissions: string[]) => store.dispatch(loginSuccess({ accessToken: 'test-only', user: { id: 1, name: 'Tester', email: 'tester@example.invalid', role, roleId: 1, roleName: role, permissions } }));
 const render = (element: React.ReactNode, path = '/') => renderToStaticMarkup(<Provider store={store}><MemoryRouter initialEntries={[path]}>{element}</MemoryRouter></Provider>);
@@ -32,6 +34,7 @@ try {
   await store.dispatch(accessApi.util.upsertQueryData('getRolePermissions', undefined, [viewPermission]));
   await store.dispatch(accessApi.util.upsertQueryData('getPermissions', undefined, [viewPermission]));
   await store.dispatch(branchesApi.util.upsertQueryData('getBranches', undefined, [{ id: 1, name: 'Dhanmondi Branch', code: 'DHK-01', location: 'Dhanmondi, Dhaka', googleMapUrl: 'https://maps.google.com/?q=Dhanmondi', openTime: '09:00', closeTime: '18:00', is24Hours: false, weeklyOffDays: ['Friday'], contactNumber: '+880 1700 000000', whatsappNumber: null, email: null, managerName: null, note: null, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }]));
+  await store.dispatch(repairsApi.util.upsertQueryData('getRepairs', undefined, [{ id: 7, ticketId: 'TD-123456', customerName: 'Repair customer', phone: '+8801700000000', email: null, brand: 'Apple', model: 'iPhone 15', service: 'Screen damage', branchId: 1, serviceMode: 'in-store', preferredDate: null, preferredTime: null, customerNotes: null, damageImages: [], branch: { id: 1, name: 'Dhanmondi Branch', code: 'DHK-01', location: 'Dhanmondi, Dhaka' }, status: 'PENDING', statusNote: null, estimatedCompletion: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), history: [] }]));
   const models = <Routes><Route path="/brand/:brandId" element={<RepairBrandModels />} /></Routes>;
 
   actor('TECHNICIAN', ['catalog.view', 'catalog.models.create', 'catalog.services.create']);
@@ -69,10 +72,18 @@ try {
   actor('BRANCH_MANAGER', ['branches.view', 'branches.create', 'branches.update', 'branches.status', 'branches.delete']);
   html = render(<Branches />);
   assert.ok(html.includes('Add branch') && html.includes('Edit') && html.includes('Set inactive') && html.includes('>Delete<'), 'Branch managers must receive each assigned CRUD and status action.');
+  actor('REPAIR_VIEWER', ['repairs.view']);
+  html = render(<RepairTracking />);
+  assert.ok(html.includes('Repair customer') && html.includes('aria-label="View TD-123456"'), 'Repair viewers must see the compact repair table and view action.');
+  assert.ok(!html.includes('aria-label="Update status for TD-123456"') && !html.includes('aria-label="Edit TD-123456"'), 'Repair viewers must not receive status or edit actions.');
+  actor('REPAIR_MANAGER', ['repairs.view', 'repairs.status', 'repairs.update']);
+  html = render(<RepairTracking />);
+  assert.ok(html.includes('aria-label="Update status for TD-123456"') && html.includes('aria-label="Edit TD-123456"'), 'Repair managers must receive separate status and edit actions.');
   console.log('Access UI checks passed: custom roles, separate action permissions, view-only staff, menu visibility, and direct-page access.');
 } finally {
   store.dispatch(accessApi.util.resetApiState());
   store.dispatch(repairCatalogApi.util.resetApiState());
   store.dispatch(authQuerySlice.util.resetApiState());
   store.dispatch(branchesApi.util.resetApiState());
+  store.dispatch(repairsApi.util.resetApiState());
 }

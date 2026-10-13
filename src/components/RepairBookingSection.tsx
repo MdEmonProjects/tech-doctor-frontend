@@ -12,8 +12,27 @@ import {
   Building2, 
   Truck, 
   Send,
-  ArrowRight
+  ArrowRight,
+  ImagePlus,
+  X
 } from 'lucide-react';
+
+const DEVICE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_DEVICE_IMAGE_SIZE = 5 * 1024 * 1024;
+
+function DeviceImagePreview({ file, onRemove }: { file: File; onRemove: () => void }) {
+  const [source, setSource] = useState('');
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setSource(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  return <div className="relative overflow-hidden rounded-sm border border-white/10 bg-[#151515]">
+    {source && <img src={source} alt={file.name} className="h-24 w-full object-cover" />}
+    <button type="button" onClick={onRemove} aria-label={`Remove ${file.name}`} className="absolute right-1.5 top-1.5 rounded-full bg-black/75 p-1 text-white transition hover:bg-red-600"><X size={14} /></button>
+    <p className="truncate px-2 py-1.5 text-[10px] text-white/50">{file.name}</p>
+  </div>;
+}
 
 interface RepairBookingSectionProps {
   initialService?: string;
@@ -38,6 +57,8 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
   const [phone, setPhone] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [images, setImages] = useState<File[]>([]);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [branchId, setBranchId] = useState<string>('');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { data: branches = [] } = useGetRepairBranchesQuery();
@@ -90,7 +111,7 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
       const repair = await createRepair({
         customerName: name.trim(), phone: phone.trim(), email: email.trim() || undefined,
         brand, model, service: repairType, serviceMode, preferredDate, preferredTime,
-        notes: notes.trim() || undefined, ...(branchId ? { branchId: Number(branchId) } : {}),
+        notes: notes.trim() || undefined, images, ...(branchId ? { branchId: Number(branchId) } : {}),
       }).unwrap();
       setBookingRef(repair.ticketId);
       setIsSubmitting(false);
@@ -110,7 +131,30 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
     setPhone('');
     setEmail('');
     setNotes('');
+    setImages([]);
+    setImageError(null);
     setBranchId('');
+  };
+
+  const addImages = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    setImageError(null);
+    if (images.length + selected.length > 3) {
+      setImageError('You can upload a maximum of 3 device photos.');
+      return;
+    }
+    const invalidType = selected.find((file) => !DEVICE_IMAGE_TYPES.has(file.type));
+    if (invalidType) {
+      setImageError('Photos must be JPEG, PNG, or WebP images.');
+      return;
+    }
+    const tooLarge = selected.find((file) => file.size > MAX_DEVICE_IMAGE_SIZE);
+    if (tooLarge) {
+      setImageError(`${tooLarge.name} is larger than 5 MB.`);
+      return;
+    }
+    setImages((current) => [...current, ...selected]);
   };
 
   return (
@@ -389,6 +433,21 @@ export const RepairBookingSection: React.FC<RepairBookingSectionProps> = ({
                   </div>
                 </div>
                 <textarea rows={3} maxLength={5000} placeholder="Anything else our technician should know? (optional)" value={notes} onChange={(event) => setNotes(event.target.value)} className="w-full bg-[#151515] border border-white/10 rounded-sm px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#D4AF37]" />
+
+                <div className="rounded-sm border border-white/10 bg-[#0d0d0d] p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="flex items-center gap-2 text-xs font-semibold text-white"><ImagePlus size={16} className="text-[#D4AF37]" />Device damage photos <span className="font-normal text-white/35">(optional)</span></p>
+                      <p className="mt-1 text-[11px] text-white/40">Upload up to 3 JPEG, PNG, or WebP images · 5 MB maximum each.</p>
+                    </div>
+                    <label className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-sm border px-4 py-2 text-xs font-semibold transition ${images.length >= 3 ? 'pointer-events-none border-white/5 text-white/25' : 'border-[#D4AF37]/50 text-[#D4AF37] hover:bg-[#D4AF37]/10'}`}>
+                      <ImagePlus size={15} />{images.length ? 'Add another' : 'Choose photos'}
+                      <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={images.length >= 3} onChange={addImages} className="sr-only" />
+                    </label>
+                  </div>
+                  {imageError && <p role="alert" className="mt-3 text-xs text-red-400">{imageError}</p>}
+                  {images.length > 0 && <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{images.map((file, index) => <DeviceImagePreview key={`${file.name}-${file.lastModified}-${index}`} file={file} onRemove={() => setImages((current) => current.filter((_, itemIndex) => itemIndex !== index))} />)}</div>}
+                </div>
               </div>
 
               {/* Step 4: Customer Details */}

@@ -1,74 +1,83 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { Clock3, MapPin, Phone, Search, Smartphone } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Eye, Pencil, RefreshCw, Search, SearchX } from 'lucide-react';
 import type { RootState } from '../../app/store';
-import { AccessPage, QueryFeedback, accessButton, accessInput, accessSecondary } from '../../components/AccessUi';
-import CatalogDialog from '../../components/CatalogDialog';
-import { catalogError } from '../../components/RepairServiceDialog';
+import { AccessPage, QueryFeedback, accessInput } from '../../components/AccessUi';
+import RepairStatusDialog, { REPAIR_STATUS_THEME } from '../../components/RepairStatusDialog';
 import { hasPermission } from '../../features/auth/permissions';
-import { REPAIR_STATUSES, REPAIR_STATUS_LABELS, useGetRepairsQuery, useUpdateRepairStatusMutation, type RepairStatus, type RepairTicket } from '../../features/repairs/repairsApi';
+import { REPAIR_STATUSES, REPAIR_STATUS_LABELS, useGetRepairsQuery, type RepairStatus, type RepairTicket } from '../../features/repairs/repairsApi';
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
-}
-
-function toLocalInput(value: string | null) {
-  if (!value) return '';
-  const date = new Date(value);
-  const offset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
-}
-
-function StatusEditor({ repair, onClose }: { repair: RepairTicket; onClose: () => void }) {
-  const [status, setStatus] = useState<RepairStatus>(repair.status);
-  const [note, setNote] = useState(repair.statusNote ?? '');
-  const [estimatedCompletion, setEstimatedCompletion] = useState(toLocalInput(repair.estimatedCompletion));
-  const [error, setError] = useState<string | null>(null);
-  const [updateStatus, { isLoading }] = useUpdateRepairStatusMutation();
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    try {
-      setError(null);
-      await updateStatus({ id: repair.id, status, note: note.trim() || undefined, estimatedCompletion: estimatedCompletion ? new Date(estimatedCompletion).toISOString() : undefined }).unwrap();
-      onClose();
-    } catch (failure) { setError(catalogError(failure)); }
-  };
-  return <CatalogDialog title={`Update ${repair.ticketId}`} onClose={() => !isLoading && onClose()}>
-    <form onSubmit={submit} className="space-y-4">
-      <label className="block text-sm font-semibold text-slate-700">Status *<select required value={status} onChange={(event) => setStatus(event.target.value as RepairStatus)} className={accessInput}>{REPAIR_STATUSES.map((entry) => <option key={entry} value={entry}>{REPAIR_STATUS_LABELS[entry]}</option>)}</select></label>
-      <label className="block text-sm font-semibold text-slate-700">Customer update<textarea maxLength={5000} rows={4} value={note} onChange={(event) => setNote(event.target.value)} className={`${accessInput} h-auto py-3`} placeholder="Tell the customer what changed or what happens next." /></label>
-      <label className="block text-sm font-semibold text-slate-700">Estimated completion<input type="datetime-local" value={estimatedCompletion} onChange={(event) => setEstimatedCompletion(event.target.value)} className={accessInput} /></label>
-      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-      <div className="flex justify-end gap-3 border-t border-slate-100 pt-4"><button type="button" disabled={isLoading} onClick={onClose} className={accessSecondary}>Cancel</button><button type="submit" disabled={isLoading} className={accessButton}>{isLoading ? 'Saving…' : 'Add status update'}</button></div>
-    </form>
-  </CatalogDialog>;
-}
+type RepairFilter = 'ALL' | RepairStatus;
+const FILTERS: RepairFilter[] = ['ALL', ...REPAIR_STATUSES];
 
 export default function RepairTracking() {
   const actor = useSelector((state: RootState) => state.auth.user);
   const { data: repairs = [], isLoading, isError, refetch } = useGetRepairsQuery();
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('ALL');
-  const [editing, setEditing] = useState<RepairTicket | null>(null);
+  const [status, setStatus] = useState<RepairFilter>('ALL');
+  const [statusTarget, setStatusTarget] = useState<RepairTicket | null>(null);
+  const canUpdateStatus = hasPermission(actor, 'repairs.status');
+  const canEdit = hasPermission(actor, 'repairs.update');
+
+  const counts = useMemo(() => {
+    const result = {} as Record<RepairStatus, number>;
+    REPAIR_STATUSES.forEach((entry) => { result[entry] = 0; });
+    repairs.forEach((repair) => { result[repair.status] += 1; });
+    return result;
+  }, [repairs]);
+
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return repairs.filter((repair) => (status === 'ALL' || repair.status === status) && `${repair.ticketId} ${repair.customerName} ${repair.phone ?? ''} ${repair.brand} ${repair.model} ${repair.service} ${repair.branch?.name ?? ''}`.toLowerCase().includes(query));
+    return repairs.filter((repair) => (
+      (status === 'ALL' || repair.status === status)
+      && `${repair.customerName} ${repair.ticketId} ${repair.phone ?? ''} ${repair.brand} ${repair.model} ${repair.service}`.toLowerCase().includes(query)
+    ));
   }, [repairs, search, status]);
 
-  return <AccessPage title="Repair Tracking" description="Review submitted repair requests and publish status updates that customers can see on the tracking page.">
-    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
-      <label className="relative"><Search size={17} className="absolute left-3 top-3.5 text-slate-400" /><input aria-label="Search repairs" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Ticket, customer, phone, device or branch" className={`${accessInput} !mt-0 pl-10`} /></label>
-      <select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)} className={`${accessInput} !mt-0`}><option value="ALL">All statuses</option>{REPAIR_STATUSES.map((entry) => <option key={entry} value={entry}>{REPAIR_STATUS_LABELS[entry]}</option>)}</select>
+  return <AccessPage title="Repair Tracking" description="Open a status queue, find a repair, and manage it from one focused workspace.">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_32px_-28px_rgba(15,23,42,0.5)]">
+      <div role="tablist" aria-label="Repair status queues" className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-slate-50/70 p-2 [scrollbar-width:thin]">
+        {FILTERS.map((entry) => {
+          const selected = status === entry;
+          const label = entry === 'ALL' ? 'All repairs' : REPAIR_STATUS_LABELS[entry];
+          const count = entry === 'ALL' ? repairs.length : counts[entry];
+          const activeClass = entry === 'ALL' ? 'border-slate-900 bg-slate-900 text-white' : REPAIR_STATUS_THEME[entry].selected;
+          return <button key={entry} type="button" role="tab" aria-selected={selected} onClick={() => setStatus(entry)} className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition ${selected ? activeClass : 'border-transparent text-slate-500 hover:border-slate-200 hover:bg-white hover:text-slate-800'}`}>
+            {entry !== 'ALL' && <span className={`h-2 w-2 rounded-full ${REPAIR_STATUS_THEME[entry].dot}`} />}{label}<span className={`rounded-md px-1.5 py-0.5 text-[11px] tabular-nums ${selected ? 'bg-white/60' : 'bg-slate-200/70'}`}>{count}</span>
+          </button>;
+        })}
+      </div>
+      <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <label className="relative min-w-0 flex-1 sm:max-w-lg"><Search size={17} className="absolute left-3.5 top-3 text-slate-400" /><input aria-label="Search repairs" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, ticket, phone, brand, model or damage" className={`${accessInput} !mt-0 border-slate-200 pl-10`} /></label>
+        <p className="text-sm text-slate-500"><span className="font-bold tabular-nums text-slate-900">{filtered.length}</span> {filtered.length === 1 ? 'repair' : 'repairs'} in this list</p>
+      </div>
     </div>
-    <QueryFeedback loading={isLoading} failed={isError} retry={() => void refetch()} empty={!filtered.length ? 'No matching repair requests.' : undefined} />
-    {!isLoading && !isError && filtered.length > 0 && <div className="space-y-3">{filtered.map((repair) => <article key={repair.id} className="rounded-xl border border-border bg-white p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-mono font-bold text-clay">{repair.ticketId}</h2><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${repair.status === 'CANCELLED' ? 'bg-red-50 text-red-700' : repair.status === 'COMPLETED' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>{REPAIR_STATUS_LABELS[repair.status]}</span></div><p className="mt-1 font-semibold text-foreground">{repair.customerName}</p></div>{hasPermission(actor, 'repairs.status') && <button type="button" onClick={() => setEditing(repair)} className={accessButton}>Add status</button>}</div>
-      <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-4"><p className="flex items-center gap-2"><Smartphone size={16} /><span>{repair.brand} {repair.model}</span></p><p className="flex items-center gap-2"><Phone size={16} /><a href={`tel:${repair.phone}`}>{repair.phone}</a></p><p className="flex items-center gap-2"><MapPin size={16} /><span>{repair.branch?.name ?? 'No branch assigned'}</span></p><p className="flex items-center gap-2"><Clock3 size={16} /><span>{formatDate(repair.createdAt)}</span></p></div>
-      <p className="mt-3 text-sm"><span className="font-semibold text-slate-700">Service:</span> <span className="text-slate-600">{repair.service}</span></p>{repair.statusNote && <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">{repair.statusNote}</p>}
-      {(repair.serviceMode || repair.preferredDate || repair.preferredTime) && <p className="mt-2 text-sm text-slate-600"><span className="font-semibold text-slate-700">Requested:</span> {[repair.serviceMode?.replace('-', ' '), repair.preferredDate, repair.preferredTime].filter(Boolean).join(' · ')}</p>}
-      {repair.customerNotes && <p className="mt-2 text-sm text-slate-600"><span className="font-semibold text-slate-700">Customer note:</span> {repair.customerNotes}</p>}
-      <details className="mt-3 text-sm"><summary className="cursor-pointer font-medium text-clay">{repair.history.length} status update{repair.history.length === 1 ? '' : 's'}</summary><ol className="mt-2 space-y-2 border-l-2 border-slate-100 pl-4">{[...repair.history].reverse().map((entry) => <li key={entry.id}><span className="font-medium text-slate-700">{REPAIR_STATUS_LABELS[entry.status]}</span><span className="ml-2 text-xs text-muted">{formatDate(entry.createdAt)}</span>{entry.note && <p className="text-slate-600">{entry.note}</p>}</li>)}</ol></details>
-    </article>)}</div>}
-    {editing && <StatusEditor repair={editing} onClose={() => setEditing(null)} />}
+
+    <QueryFeedback loading={isLoading} failed={isError} retry={() => void refetch()} />
+
+    {!isLoading && !isError && filtered.length === 0 && <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 py-12 text-center"><SearchX className="mx-auto text-slate-400" /><p className="mt-3 font-semibold text-slate-800">No matching repairs</p><p className="mt-1 text-sm text-slate-500">Try a different status or search term.</p></div>}
+
+    {!isLoading && !isError && filtered.length > 0 && <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-[0_12px_35px_-30px_rgba(15,23,42,0.55)]">
+      <table className="min-w-[1050px] w-full text-sm">
+        <thead className="border-b border-slate-200 bg-slate-50/90 text-left text-xs font-bold uppercase tracking-wider text-slate-500"><tr><th className="w-16 px-4 py-3.5 text-center">SL</th><th className="px-4 py-3.5">Name</th><th className="px-4 py-3.5">Number</th><th className="px-4 py-3.5">Phone</th><th className="px-4 py-3.5">Brand</th><th className="px-4 py-3.5">Model</th><th className="px-4 py-3.5">Damage type</th><th className="px-4 py-3.5 text-right">Action</th></tr></thead>
+        <tbody className="divide-y divide-slate-100">{filtered.map((repair, index) => <tr key={repair.id} className="transition hover:bg-[#fffaf7]">
+          <td className="px-4 py-4 text-center font-medium tabular-nums text-slate-400">{index + 1}</td>
+          <td className="px-4 py-4 font-semibold text-slate-800">{repair.customerName}</td>
+          <td className="px-4 py-4 font-mono font-bold text-clay">{repair.ticketId}</td>
+          <td className="px-4 py-4"><a href={`tel:${repair.phone}`} className="text-slate-600 hover:text-clay">{repair.phone ?? '—'}</a></td>
+          <td className="px-4 py-4 text-slate-600">{repair.brand}</td>
+          <td className="px-4 py-4 text-slate-600">{repair.model}</td>
+          <td className="px-4 py-4"><span className="inline-flex rounded-lg bg-slate-100 px-2.5 py-1 font-medium text-slate-700">{repair.service}</span></td>
+          <td className="px-4 py-4"><div className="flex justify-end gap-2">
+            <Link aria-label={`View ${repair.ticketId}`} to={`/dashboard/repair-service/repair-tracking/${repair.id}`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-semibold text-slate-700 transition hover:border-clay/40 hover:bg-clay/5 hover:text-clay"><Eye size={14} />View</Link>
+            {canUpdateStatus && <button aria-label={`Update status for ${repair.ticketId}`} type="button" onClick={() => setStatusTarget(repair)} className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"><RefreshCw size={14} />Status</button>}
+            {canEdit && <Link aria-label={`Edit ${repair.ticketId}`} to={`/dashboard/repair-service/repair-tracking/${repair.id}?panel=edit`} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs font-semibold text-amber-800 transition hover:bg-amber-100"><Pencil size={14} />Edit</Link>}
+          </div></td>
+        </tr>)}</tbody>
+      </table>
+    </div>}
+
+    {statusTarget && <RepairStatusDialog repair={statusTarget} onClose={() => setStatusTarget(null)} />}
   </AccessPage>;
 }

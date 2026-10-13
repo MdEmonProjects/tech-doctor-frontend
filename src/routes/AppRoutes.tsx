@@ -37,6 +37,7 @@ import { accessApi } from '../features/access/accessApi';
 import type { AppDispatch } from '../app/store';
 import Branches from '../pages/Admin/Branches';
 import RepairTracking from '../pages/Admin/RepairTracking';
+import RepairDetails from '../pages/Admin/RepairDetails';
 
 export function AppRoutes() {
   const location = useLocation();
@@ -104,7 +105,10 @@ export function AppRoutes() {
             <Route path="repair-service/brands-services" element={<RepairBrandsServices />} />
             <Route path="repair-service/brands-services/:brandId" element={<RepairBrandModels />} />
           </Route>
-          <Route element={<PermissionRoute permission="repairs.view" />}><Route path="repair-service/repair-tracking" element={<RepairTracking />} /></Route>
+          <Route element={<PermissionRoute permission="repairs.view" />}>
+            <Route path="repair-service/repair-tracking" element={<RepairTracking />} />
+            <Route path="repair-service/repair-tracking/:repairId" element={<RepairDetails />} />
+          </Route>
           <Route element={<PermissionRoute permission="users.view" />}><Route path="users/accounts" element={<Users />} /></Route>
           <Route element={<PermissionRoute permission="roles.view" />}><Route path="users/roles" element={<Roles />} /></Route>
           <Route element={<PermissionRoute permission="permissions.view" />}><Route path="users/permissions" element={<Permissions />} /></Route>
