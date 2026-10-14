@@ -35,7 +35,7 @@ export function HomePage() {
         wishlist={wishlist}
         onToggleWishlist={toggleWishlist}
         onAddToCart={addToCart}
-        onQuickView={(p) => openOverlay(`/products/${p.id}`)}
+        onQuickView={(p) => openOverlay(`/products/${p.slug ?? p.id}`)}
         onViewAllClick={() => navigateTo('shop')}
       />
 

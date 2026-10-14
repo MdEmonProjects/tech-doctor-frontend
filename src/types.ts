@@ -1,8 +1,9 @@
 export interface Product {
   id: string;
+  slug?: string;
   name: string;
-  brand: 'Apple' | 'Samsung' | 'Google' | 'OnePlus' | 'Tech Doctor' | 'Anker' | 'Sony';
-  category: 'smartphones' | 'cases' | 'chargers' | 'audio' | 'screen_protectors' | 'smartwatches';
+  brand: string;
+  category: string;
   price: number;
   originalPrice?: number;
   rating: number;
@@ -15,6 +16,14 @@ export interface Product {
   colors?: string[];
   features?: string[];
   warrantyMonths?: number;
+  warranty?: string;
+  images?: string[];
+  specifications?: { title: string; rows: { label: string; value: string }[] }[];
+  model?: string;
+  sku?: string;
+  stockStatus?: string;
+  isFeatured?: boolean;
+  quantity?: number;
 }
 
 export interface CategoryItem {

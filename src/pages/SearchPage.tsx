@@ -7,7 +7,7 @@ export function SearchPage() {
     <SearchOverlay
       isOpen
       onClose={closeOverlay}
-      onSelectProduct={(p) => openOverlay(`/products/${p.id}`)}
+      onSelectProduct={(p) => openOverlay(`/products/${p.slug ?? p.id}`)}
       onSelectRepair={bookRepair}
       onSelectCategory={(cat) => navigateTo('shop', cat)}
     />

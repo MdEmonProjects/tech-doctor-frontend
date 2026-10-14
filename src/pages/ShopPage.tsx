@@ -1,23 +1,29 @@
 import { useApp } from '../context/AppProvider';
 import React, { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { PRODUCTS, CATEGORIES } from '../data/mockData';
+import { useStoreProducts } from '../features/products/productsApi';
+import { useGetPublicProductCategoriesQuery } from '../features/productCategories/productCategoriesApi';
+import { matchesShopCategory, storefrontCategories } from '../features/productCategories/storefrontCategories';
 import { Product } from '../types';
 import { ProductCard } from '../components/ProductCard';
 import { Filter, SlidersHorizontal, ArrowUpDown, Sparkles, Check } from 'lucide-react';
 
-const BRANDS = ['Apple', 'Samsung', 'Google', 'OnePlus', 'Tech Doctor', 'Anker', 'Sony'];
-
 export const ShopPage = () => {
+  const { products, isLoading, isError, refetch } = useStoreProducts();
+  const brands = [...new Set(products.map((product) => product.brand).filter(Boolean))].sort();
+  const maxPrice = Math.max(100, Math.ceil(Math.max(0, ...products.map((product) => product.price)) / 100) * 100);
+  const { data: publicCategories } = useGetPublicProductCategoriesQuery();
+  const categories = storefrontCategories(publicCategories, products);
   const { wishlist, toggleWishlist: onToggleWishlist, addToCart: onAddToCart, openOverlay } = useApp();
-  const onQuickView = (product: Product) => openOverlay(`/products/${product.id}`);
+  const onQuickView = (product: Product) => openOverlay(`/products/${product.slug ?? product.id}`);
   const [params, setSearchParams] = useSearchParams();
   const selectedCategory = params.get('category') ?? 'all';
+  const categoryAvailable = selectedCategory === 'all' || selectedCategory === 'smartphones' || categories.some((category) => category.slug === selectedCategory);
   const selectedBrand = params.get('brand') ?? 'all';
   const sortBy = params.get('sort') ?? 'featured';
   const inStockOnly = params.get('inStock') === 'true';
-  const requestedPrice = Number(params.get('maxPrice') ?? 1500);
-  const priceRange = Number.isFinite(requestedPrice) && requestedPrice >= 0 ? requestedPrice : 1500;
+  const requestedPrice = Number(params.get('maxPrice') ?? maxPrice);
+  const priceRange = Number.isFinite(requestedPrice) && requestedPrice >= 0 ? requestedPrice : maxPrice;
   const updateFilter = (name: string, value: string, defaultValue: string, replace = false) => {
     const next = new URLSearchParams(params);
     if (value === defaultValue) next.delete(name);
@@ -28,19 +34,11 @@ export const ShopPage = () => {
   const setSelectedBrand = (value: string) => updateFilter('brand', value, 'all');
   const setSortBy = (value: string) => updateFilter('sort', value, 'featured');
   const setInStockOnly = (value: boolean) => updateFilter('inStock', String(value), 'false');
-  const setPriceRange = (value: number) => updateFilter('maxPrice', String(value), '1500', true);
-
-  const matchesCategory = (product: Product, category: string) => {
-    const phoneBrands: Record<string, string> = { iphone: 'Apple', samsung: 'Samsung', 'google-pixel': 'Google' };
-    if (category === 'all') return true;
-    if (phoneBrands[category]) return product.category === 'smartphones' && product.brand === phoneBrands[category];
-    if (category === 'android-phones') return product.category === 'smartphones' && product.brand !== 'Apple';
-    return product.category === (category === 'phone-cases' ? 'cases' : category);
-  };
+  const setPriceRange = (value: number) => updateFilter('maxPrice', String(value), String(maxPrice), true);
 
   const filteredProducts = useMemo(() => {
-    return PRODUCTS.filter((product) => {
-      if (!matchesCategory(product, selectedCategory)) return false;
+    return products.filter((product) => {
+      if (!categoryAvailable || !matchesShopCategory(product, selectedCategory)) return false;
       if (selectedBrand !== 'all' && product.brand !== selectedBrand) return false;
       if (inStockOnly && !product.inStock) return false;
       if (product.price > priceRange) return false;
@@ -51,7 +49,7 @@ export const ShopPage = () => {
       if (sortBy === 'rating') return b.rating - a.rating;
       return 0; // featured
     });
-  }, [selectedCategory, selectedBrand, sortBy, inStockOnly, priceRange]);
+  }, [products, selectedCategory, categoryAvailable, selectedBrand, sortBy, inStockOnly, priceRange]);
 
   return (
     <div className="bg-[#080808] min-h-screen text-white py-10 border-b border-white/5">
@@ -106,9 +104,9 @@ export const ShopPage = () => {
                   }`}
                 >
                   <span>All Categories</span>
-                  <span className="text-[10px] font-mono">({PRODUCTS.length})</span>
+                  <span className="text-[10px] font-mono">({products.length})</span>
                 </button>
-                {CATEGORIES.map((cat) => (
+                {categories.map((cat) => (
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.slug)}
@@ -120,7 +118,7 @@ export const ShopPage = () => {
                   >
                     <span>{cat.name}</span>
                     <span className="text-[10px] font-mono">
-                      ({PRODUCTS.filter((p) => matchesCategory(p, cat.slug)).length})
+                      ({cat.count})
                     </span>
                   </button>
                 ))}
@@ -143,7 +141,7 @@ export const ShopPage = () => {
                 >
                   <span>All Brands</span>
                 </button>
-                {BRANDS.map((brand) => (
+                {brands.map((brand) => (
                   <button
                     key={brand}
                     onClick={() => setSelectedBrand(brand)}
@@ -155,7 +153,7 @@ export const ShopPage = () => {
                   >
                     <span>{brand}</span>
                     <span className="text-[10px] font-mono">
-                      ({PRODUCTS.filter((p) => p.brand === brand).length})
+                      ({products.filter((p) => p.brand === brand).length})
                     </span>
                   </button>
                 ))}
@@ -170,9 +168,9 @@ export const ShopPage = () => {
               </div>
               <input
                 type="range"
-                min="20"
-                max="1500"
-                step="20"
+                min="0"
+                max={Math.max(maxPrice, priceRange)}
+                step="1"
                 value={priceRange}
                 onChange={(e) => setPriceRange(Number(e.target.value))}
                 className="w-full accent-[#D4AF37] bg-neutral-800 h-1.5 rounded-lg appearance-none cursor-pointer"
@@ -220,15 +218,13 @@ export const ShopPage = () => {
             </div>
 
             {/* Products Grid */}
-            {filteredProducts.length === 0 ? (
+            {isLoading ? <p role="status" className="py-12 text-center text-sm text-neutral-400">Loading products…</p> : isError ? <p role="alert" className="py-12 text-center text-sm text-red-400">Could not load products. <button type="button" onClick={() => void refetch()} className="underline">Try again</button></p> : filteredProducts.length === 0 ? (
               <div className="bg-[#111111] rounded-sm border border-white/10 p-12 text-center space-y-3">
                 <p className="text-sm font-semibold text-white">No products match your current filters.</p>
                 <p className="text-xs text-neutral-400">Try broadening your price range or resetting the category selection.</p>
                 <button
                   onClick={() => {
-                    setSelectedCategory('all');
-                    setSelectedBrand('all');
-                    setPriceRange(1500);
+                    setSearchParams({});
                   }}
                   className="bg-[#D4AF37] hover:bg-[#C19A2F] text-black text-xs font-semibold uppercase tracking-wider px-5 py-2.5 rounded-xs transition-colors cursor-pointer"
                 >

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Product } from '../types';
 import { X, Star, ShoppingBag, Heart, ShieldCheck, Truck, Check } from 'lucide-react';
+import ProductSpecifications from './ProductSpecifications';
 
 interface ProductQuickViewModalProps {
   product: Product | null;
@@ -21,10 +22,12 @@ export const ProductQuickViewModal: React.FC<ProductQuickViewModalProps> = ({
     product?.colors ? product.colors[0] : ''
   );
   const [quantity, setQuantity] = useState<number>(1);
+  const [selectedImage, setSelectedImage] = useState(0);
 
   if (!product) return null;
 
   const handleAdd = () => {
+    if (!product.inStock) return;
     onAddToCart(product, quantity, selectedColor);
     onClose();
   };
@@ -54,12 +57,14 @@ export const ProductQuickViewModal: React.FC<ProductQuickViewModalProps> = ({
             <div className="md:col-span-5 bg-[#080808] rounded-sm p-6 flex flex-col items-center justify-center border border-white/5">
               <div className="w-full aspect-square relative flex items-center justify-center">
                 <img
-                  src={product.image}
+                  src={product.images?.[selectedImage] ?? product.image}
                   alt={product.name}
                   referrerPolicy="no-referrer"
                   className="max-h-64 object-contain"
                 />
               </div>
+
+              {product.images && product.images.length > 1 && <div className="mt-3 flex flex-wrap gap-2">{product.images.map((url, index) => <button key={url} type="button" aria-label={`View product image ${index + 1}`} onClick={() => setSelectedImage(index)} className={`rounded border p-1 ${selectedImage === index ? 'border-[#D4AF37]' : 'border-white/10'}`}><img src={url} alt="" className="size-12 object-contain" /></button>)}</div>}
 
               {product.badge && (
                 <div className="mt-3 bg-[#D4AF37] text-black text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-xs">
@@ -73,7 +78,7 @@ export const ProductQuickViewModal: React.FC<ProductQuickViewModalProps> = ({
               
               <div>
                 <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-[#D4AF37] block">
-                  {product.brand} &bull; {product.category.replace('_', ' ')}
+                  {product.brand && <>{product.brand} &bull; </>}{product.category.replace('_', ' ')}
                 </span>
                 <h3 className="text-xl sm:text-2xl font-light text-white mt-1">
                   {product.name}
@@ -83,7 +88,7 @@ export const ProductQuickViewModal: React.FC<ProductQuickViewModalProps> = ({
                 <div className="flex items-center space-x-1.5 mt-2">
                   <div className="flex text-[#D4AF37]">
                     {[...Array(5)].map((_, i) => (
-                      <Star key={i} className="w-3.5 h-3.5 fill-current" />
+                      <Star key={i} className={`w-3.5 h-3.5 ${i < Math.floor(product.rating) ? 'fill-current' : 'text-white/20'}`} />
                     ))}
                   </div>
                   <span className="text-xs font-semibold text-white">
@@ -106,14 +111,16 @@ export const ProductQuickViewModal: React.FC<ProductQuickViewModalProps> = ({
                   </span>
                 )}
                 <span className="text-xs text-[#D4AF37] font-semibold bg-[#D4AF37]/10 px-2 py-0.5 rounded-xs border border-[#D4AF37]/20 flex items-center">
-                  <Check className="w-3 h-3 mr-1 text-[#D4AF37]" /> In Stock &amp; Insured
+                  {product.stockStatus ?? (product.inStock ? 'In stock' : 'Out of stock')}
                 </span>
               </div>
 
               {/* Description */}
               <p className="text-xs text-neutral-400 leading-relaxed font-light">
-                {product.description}
+                {product.specs}
               </p>
+              {product.sku && <p className="text-xs text-neutral-400">Product code: {product.sku}{product.model ? ` · Model: ${product.model}` : ''}</p>}
+              {!!product.features?.length && <ul className="list-disc space-y-1 pl-4 text-xs text-neutral-300">{product.features.map((feature, index) => <li key={index}>{feature}</li>)}</ul>}
 
               {/* Color Selector */}
               {product.colors && product.colors.length > 0 && (
@@ -153,7 +160,8 @@ export const ProductQuickViewModal: React.FC<ProductQuickViewModalProps> = ({
                     {quantity}
                   </span>
                   <button
-                    onClick={() => setQuantity(quantity + 1)}
+                    onClick={() => setQuantity(Math.min(product.quantity ?? 99, quantity + 1))}
+                    disabled={!product.inStock || quantity >= (product.quantity ?? 99)}
                     className="px-3 py-2 text-neutral-400 hover:text-white font-bold text-sm"
                   >
                     +
@@ -162,10 +170,11 @@ export const ProductQuickViewModal: React.FC<ProductQuickViewModalProps> = ({
 
                 <button
                   onClick={handleAdd}
+                  disabled={!product.inStock}
                   className="flex-1 bg-[#D4AF37] hover:bg-[#C19A2F] text-black text-xs font-semibold uppercase tracking-wider py-3 px-5 rounded-sm shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer"
                 >
                   <ShoppingBag className="w-4 h-4" />
-                  <span>ADD TO CART (${(product.price * quantity).toFixed(2)})</span>
+                  <span>{product.inStock ? `ADD TO CART ($${(product.price * quantity).toFixed(2)})` : product.stockStatus ?? 'Out of stock'}</span>
                 </button>
 
                 <button
@@ -185,7 +194,7 @@ export const ProductQuickViewModal: React.FC<ProductQuickViewModalProps> = ({
               <div className="pt-3 border-t border-white/5 grid grid-cols-2 gap-2 text-[11px] text-neutral-400 font-light">
                 <div className="flex items-center space-x-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 text-[#D4AF37] shrink-0" />
-                  <span>{product.warrantyMonths || 12}-Month Guarantee</span>
+                  <span>{product.warranty ?? (product.warrantyMonths ? `${product.warrantyMonths}-Month Guarantee` : 'Contact us for warranty details')}</span>
                 </div>
                 <div className="flex items-center space-x-1.5">
                   <Truck className="w-3.5 h-3.5 text-[#D4AF37] shrink-0" />
@@ -196,6 +205,8 @@ export const ProductQuickViewModal: React.FC<ProductQuickViewModalProps> = ({
             </div>
 
           </div>
+          {!!product.specifications?.length && <section className="mt-8 border-t border-white/10 pt-6"><h2 className="mb-4 text-lg font-semibold">Specifications</h2><ProductSpecifications groups={product.specifications} dark /></section>}
+          {product.description && <section className="mt-6 border-t border-white/10 pt-6"><h2 className="mb-3 text-lg font-semibold">Description</h2><p className="whitespace-pre-wrap text-sm leading-7 text-neutral-400">{product.description}</p></section>}
 
         </div>
       </div>

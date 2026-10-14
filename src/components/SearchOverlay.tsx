@@ -1,5 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { PRODUCTS, REPAIR_SERVICES, CATEGORIES } from '../data/mockData';
+import { REPAIR_SERVICES } from '../data/mockData';
+import { useStoreProducts } from '../features/products/productsApi';
+import { useGetPublicProductCategoriesQuery } from '../features/productCategories/productCategoriesApi';
+import { storefrontCategories } from '../features/productCategories/storefrontCategories';
 import { Product } from '../types';
 import { Search, X, Smartphone, Wrench } from 'lucide-react';
 
@@ -19,18 +22,21 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
   onSelectCategory
 }) => {
   const [query, setQuery] = useState('');
+  const { products } = useStoreProducts();
+  const { data: publicCategories } = useGetPublicProductCategoriesQuery(undefined, { skip: !isOpen });
+  const categories = storefrontCategories(publicCategories);
 
   const matchedProducts = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase();
-    return PRODUCTS.filter(
+    return products.filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
         p.brand.toLowerCase().includes(q) ||
         p.specs.toLowerCase().includes(q) ||
         p.category.toLowerCase().includes(q)
     );
-  }, [query]);
+  }, [query, products]);
 
   const matchedRepairs = useMemo(() => {
     if (!query.trim()) return [];
@@ -94,7 +100,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
                     Popular Departments
                   </h4>
                   <div className="flex flex-wrap gap-2">
-                    {CATEGORIES.slice(0, 6).map((cat) => (
+                    {categories.slice(0, 6).map((cat) => (
                       <button
                         key={cat.id}
                         onClick={() => {

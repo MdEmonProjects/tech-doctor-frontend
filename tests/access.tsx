@@ -18,6 +18,11 @@ import Branches from '../src/pages/Admin/Branches';
 import { branchesApi } from '../src/features/branches/branchesApi';
 import RepairTracking from '../src/pages/Admin/RepairTracking';
 import { repairsApi } from '../src/features/repairs/repairsApi';
+import Products from '../src/pages/Admin/Products';
+import ProductEditor from '../src/pages/Admin/ProductEditor';
+import { productsApi } from '../src/features/products/productsApi';
+import { AppProvider } from '../src/context/AppProvider';
+import { catalogProducts, categories } from './productFixtures';
 
 const actor = (role: string, permissions: string[]) => store.dispatch(loginSuccess({ accessToken: 'test-only', user: { id: 1, name: 'Tester', email: 'tester@example.invalid', role, roleId: 1, roleName: role, permissions } }));
 const render = (element: React.ReactNode, path = '/') => renderToStaticMarkup(<Provider store={store}><MemoryRouter initialEntries={[path]}>{element}</MemoryRouter></Provider>);
@@ -26,6 +31,17 @@ const viewPermission: Permission = { id: 1, key: 'catalog.view', name: 'View cat
 const staffRole: AccessRole = { id: 2, key: 'STAFF', name: 'Staff', description: null, isSystem: true, _count: { users: 1 }, permissions: [{ permissionId: 1, permission: viewPermission }] };
 
 try {
+  await store.dispatch(productsApi.util.upsertQueryData('getAdminProducts', undefined, catalogProducts));
+  await store.dispatch(productsApi.util.upsertQueryData('getProductEditorCategories', undefined, categories.map((category) => ({ ...category, specificationTemplate: null }))));
+  actor('PRODUCT_VIEWER', ['products.view']);
+  let productHtml = render(<AppProvider><Products /></AppProvider>);
+  assert.ok(productHtml.includes(catalogProducts[0].sku ?? ''), 'Product viewers must see live catalog data.');
+  assert.ok(!productHtml.includes('Add product') && !productHtml.includes('aria-label="Edit ') && !productHtml.includes('aria-label="Delete '), 'Viewing products must not grant modification access.');
+  actor('PRODUCT_EDITOR', ['products.view', 'products.create', 'products.update', 'products.delete']);
+  productHtml = render(<AppProvider><Products /></AppProvider>);
+  assert.ok(productHtml.includes('Add product') && productHtml.includes('aria-label="Edit ') && productHtml.includes('aria-label="Delete '), 'Each product action must be available with its permission.');
+  productHtml = render(<AppProvider><ProductEditor /></AppProvider>);
+  assert.ok(productHtml.includes('Product images') && productHtml.includes('Add specification group') && productHtml.includes('Pricing · USD'), 'Product editors must show images, dynamic specifications, and USD pricing.');
   await store.dispatch(repairCatalogApi.util.upsertQueryData('getRepairCatalog', undefined, [{ id: 99, name: 'Example brand', models: [{ id: 10, name: 'Phone X', deviceType: 'Phone', services: [{ id: 11, service, price: 45 }] }] }]));
   await store.dispatch(repairCatalogApi.util.upsertQueryData('getRepairServices', undefined, [service]));
   await store.dispatch(accessApi.util.upsertQueryData('getUsers', undefined, [{ id: 2, name: 'Staff user', email: 'staff@example.invalid', roleId: 2, isActive: true, createdAt: new Date().toISOString(), assignedRole: { key: 'STAFF', name: 'Staff' } }]));
@@ -86,4 +102,5 @@ try {
   store.dispatch(authQuerySlice.util.resetApiState());
   store.dispatch(branchesApi.util.resetApiState());
   store.dispatch(repairsApi.util.resetApiState());
+  store.dispatch(productsApi.util.resetApiState());
 }

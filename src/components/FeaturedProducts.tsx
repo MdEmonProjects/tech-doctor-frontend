@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PRODUCTS } from '../data/mockData';
+import { useStoreProducts } from '../features/products/productsApi';
 import { Product } from '../types';
 import { ProductCard } from './ProductCard';
 import { ArrowRight, Sparkles } from 'lucide-react';
@@ -20,10 +20,12 @@ export const FeaturedProducts: React.FC<FeaturedProductsProps> = ({
   onViewAllClick
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'flagships' | 'accessories' | 'chargers'>('all');
+  const { products, isLoading, isError, refetch } = useStoreProducts();
 
-  const filteredProducts = PRODUCTS.filter((product) => {
-    if (activeTab === 'flagships') return product.category === 'smartphones';
-    if (activeTab === 'accessories') return product.category === 'cases' || product.category === 'audio';
+  const filteredProducts = products.filter((product) => {
+    if (!product.isFeatured) return false;
+    if (activeTab === 'flagships') return ['smartphones', 'iphone', 'samsung', 'google-pixel', 'android-phones'].includes(product.category);
+    if (activeTab === 'accessories') return ['cases', 'phone-cases', 'audio'].includes(product.category);
     if (activeTab === 'chargers') return product.category === 'chargers';
     return true;
   });
@@ -90,6 +92,9 @@ export const FeaturedProducts: React.FC<FeaturedProductsProps> = ({
         </div>
 
         {/* Products Grid */}
+        {isLoading && <p role="status" className="py-6 text-center text-sm text-white/50">Loading featured products…</p>}
+        {isError && <p role="alert" className="py-6 text-center text-sm text-red-400">Could not load products. <button type="button" onClick={() => void refetch()} className="underline">Try again</button></p>}
+        {!isLoading && !isError && !filteredProducts.length && <p className="py-6 text-center text-sm text-white/50">No featured products in this selection yet.</p>}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {filteredProducts.slice(0, 8).map((product) => (
             <ProductCard

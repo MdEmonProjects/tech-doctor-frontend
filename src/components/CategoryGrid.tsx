@@ -1,5 +1,7 @@
 import React from 'react';
-import { CATEGORIES } from '../data/mockData';
+import { useGetPublicProductCategoriesQuery } from '../features/productCategories/productCategoriesApi';
+import { storefrontCategories } from '../features/productCategories/storefrontCategories';
+import { useStoreProducts } from '../features/products/productsApi';
 import { ChevronRight } from 'lucide-react';
 
 interface CategoryGridProps {
@@ -7,6 +9,9 @@ interface CategoryGridProps {
 }
 
 export const CategoryGrid: React.FC<CategoryGridProps> = ({ onSelectCategory }) => {
+  const { data: publicCategories } = useGetPublicProductCategoriesQuery();
+  const { products } = useStoreProducts();
+  const categories = storefrontCategories(publicCategories, products);
   return (
     <section className="py-16 bg-[#080808] border-b border-white/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -28,7 +33,7 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({ onSelectCategory }) 
 
         {/* Categories Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 sm:gap-6">
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <div
               key={cat.id}
               onClick={() => onSelectCategory(cat.slug)}
@@ -36,12 +41,12 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({ onSelectCategory }) 
             >
               {/* Circular Container with Dark Luxury Border */}
               <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#111111] border border-white/10 group-hover:border-[#D4AF37] group-hover:shadow-[0_0_20px_rgba(212,175,55,0.15)] flex items-center justify-center p-3 transition-all duration-300 transform group-hover:-translate-y-1">
-                <img
+                {cat.image ? <img
                   src={cat.image}
                   alt={cat.name}
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-contain filter contrast-105"
-                />
+                /> : <span className="flex size-full items-center justify-center text-2xl font-semibold text-[#D4AF37]">{cat.name.charAt(0)}</span>}
                 
                 <div className="absolute inset-0 rounded-full bg-[#D4AF37]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>

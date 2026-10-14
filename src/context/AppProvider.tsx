@@ -97,6 +97,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Cart Management
   const addToCart = (product: Product, quantity = 1, color?: string) => {
+    if (!product.inStock) { notify('Product unavailable', 'This product is currently unavailable for purchase.', 'warning'); return; }
     setCart((prev) => {
       const existing = prev.find(
         (item) => item.product.id === product.id && item.selectedColor === color

@@ -74,7 +74,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {/* Brand & Category */}
           <div className="flex items-center justify-between text-[10px] uppercase font-mono tracking-widest text-white/40 mb-1">
             <span>{product.brand}</span>
-            <span className="text-[#D4AF37] font-semibold">{product.warrantyMonths}M Warranty</span>
+            <span className="max-w-32 truncate text-[#D4AF37] font-semibold">{product.warranty ?? (product.warrantyMonths ? `${product.warrantyMonths}M Warranty` : '')}</span>
           </div>
 
           {/* Title */}
@@ -135,9 +135,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
           <button
             onClick={() => onAddToCart(product)}
+            disabled={!product.inStock}
             className="bg-white/5 hover:bg-[#D4AF37] text-white hover:text-black border border-white/10 hover:border-[#D4AF37] p-2.5 rounded-sm transition-all shadow-xs cursor-pointer"
             aria-label="Add to cart"
-            title="Add to Cart"
+            title={product.inStock ? 'Add to Cart' : product.stockStatus ?? 'Out of stock'}
           >
             <ShoppingBag className="w-4 h-4" />
           </button>

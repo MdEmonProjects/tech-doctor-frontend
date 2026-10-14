@@ -11,6 +11,13 @@ export const menuData: SidebarMenuItem[] = [
   { id: '1', name: 'Dashboard', route: '', icon: 'Dashboard', subMenu: false },
   { id: 'branches', name: 'Branches', route: 'branches', icon: 'LuWarehouse', subMenu: false, permission: 'branches.view' },
   {
+    id: '3', name: 'Product & Devices', route: 'products-devices', icon: 'UserPlus',
+    subMenu: [
+      { id: '31', name: 'Categories', route: 'categories', icon: '', subMenu: false, permission: 'product_categories.view' },
+      { id: '32', name: 'Products', route: 'products', icon: '', subMenu: false, permission: 'products.view' },
+    ],
+  },
+  {
     id: '2', name: 'Repair & Service', route: 'repair-service', icon: 'UserPlus',
     subMenu: [
       { id: '22', name: 'Repair Tracking', route: 'repair-tracking', icon: '', subMenu: false, permission: 'repairs.view' },

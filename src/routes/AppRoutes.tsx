@@ -38,6 +38,10 @@ import type { AppDispatch } from '../app/store';
 import Branches from '../pages/Admin/Branches';
 import RepairTracking from '../pages/Admin/RepairTracking';
 import RepairDetails from '../pages/Admin/RepairDetails';
+import ProductCategories from '../pages/Admin/ProductCategories';
+import Products from '../pages/Admin/Products';
+import ProductEditor from '../pages/Admin/ProductEditor';
+import ProductDetails from '../pages/Admin/ProductDetails';
 
 export function AppRoutes() {
   const location = useLocation();
@@ -104,6 +108,19 @@ export function AppRoutes() {
           <Route element={<PermissionRoute permission="catalog.view" />}>
             <Route path="repair-service/brands-services" element={<RepairBrandsServices />} />
             <Route path="repair-service/brands-services/:brandId" element={<RepairBrandModels />} />
+          </Route>
+          <Route element={<PermissionRoute permission="product_categories.view" />}>
+            <Route path="products-devices/categories" element={<ProductCategories />} />
+          </Route>
+          <Route element={<PermissionRoute permission="products.view" />}>
+            <Route path="products-devices/products" element={<Products />} />
+            <Route path="products-devices/products/:productId" element={<ProductDetails />} />
+            <Route element={<PermissionRoute permission="products.create" />}>
+              <Route path="products-devices/products/new" element={<ProductEditor />} />
+            </Route>
+            <Route element={<PermissionRoute permission="products.update" />}>
+              <Route path="products-devices/products/:productId/edit" element={<ProductEditor />} />
+            </Route>
           </Route>
           <Route element={<PermissionRoute permission="repairs.view" />}>
             <Route path="repair-service/repair-tracking" element={<RepairTracking />} />

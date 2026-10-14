@@ -4,7 +4,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from '../src/routes/ProtectedRoute';
 import App from '../src/App';
-import { PRODUCTS } from '../src/data/mockData';
+import { catalogProducts, categories, products as PRODUCTS } from './productFixtures';
+import store from '../src/app/store';
+import { productsApi } from '../src/features/products/productsApi';
+import { productCategoriesApi } from '../src/features/productCategories/productCategoriesApi';
 import { PAGE_PATHS, getNavigationPath } from '../src/navigation';
 
 const render = (path: string, state?: unknown) => renderToStaticMarkup(
@@ -12,6 +15,13 @@ const render = (path: string, state?: unknown) => renderToStaticMarkup(
     <App />
   </MemoryRouter>,
 );
+
+await store.dispatch(productsApi.util.upsertQueryData('getPublicProducts', undefined, catalogProducts));
+await store.dispatch(productCategoriesApi.util.upsertQueryData('getPublicProductCategories', undefined, categories));
+for (const product of catalogProducts) {
+  await store.dispatch(productsApi.util.upsertQueryData('getPublicProduct', String(product.id), product));
+  await store.dispatch(productsApi.util.upsertQueryData('getPublicProduct', product.slug, product));
+}
 
 for (const path of Object.values(PAGE_PATHS)) {
   const html = render(path);
@@ -26,17 +36,17 @@ for (const [path, content] of [
   ['/checkout', 'Insured Express Checkout'],
   ['/repairs/book', 'Reserve Bench Appointment'],
   [`/products/${PRODUCTS[0].id}`, 'Close modal'],
-  ['/products/missing-product', 'Product not found'],
+  ['/products/invalid_product', 'Product not found'],
   ['/missing-page', 'Page not found'],
 ]) {
   assert.ok(render(path).includes(content), `${path} must render ${content}`);
 }
 
 for (const [category, productCategory, brand] of [
-  ['iphone', 'smartphones', 'Apple'],
-  ['samsung', 'smartphones', 'Samsung'],
-  ['google-pixel', 'smartphones', 'Google'],
-  ['phone-cases', 'cases', undefined],
+  ['iphone', 'iphone', 'Apple'],
+  ['samsung', 'samsung', 'Samsung'],
+  ['google-pixel', 'google-pixel', 'Google'],
+  ['phone-cases', 'phone-cases', undefined],
 ]) {
   const html = render(getNavigationPath('shop', category));
   for (const product of PRODUCTS) {
@@ -50,6 +60,8 @@ const backgroundLocation = { pathname: '/shop', search: '?category=iphone', hash
 const modalHtml = render(`/products/${PRODUCTS[0].id}`, { backgroundLocation });
 assert.ok(modalHtml.includes('AUTHENTIC ELECTRONICS CATALOG'), 'Product overlay must retain the shop behind it');
 assert.ok(modalHtml.includes('Close modal'), 'Product overlay must display its product');
+assert.ok(modalHtml.includes('Test specifications') && modalHtml.includes('Test value'), 'Product overlays must display dynamic specifications from the API.');
+assert.ok(render(`/products/${catalogProducts[0].slug}`).includes('Close modal'), 'Product slugs must open product details.');
 assert.ok(!render('/shop?maxPrice=0').includes(PRODUCTS[0].name), 'Price filters must apply on direct visits');
 assert.ok(render('/shop?maxPrice=invalid').includes(PRODUCTS[0].name), 'Invalid prices must use the default');
 assert.equal(getNavigationPath('tradein'), '/trade-in');
@@ -74,3 +86,7 @@ const homeHtml = render('/');
 assert.equal((homeHtml.match(/<header\b/g) ?? []).length, 1, 'The shared header must render once');
 assert.equal((homeHtml.match(/<footer\b/g) ?? []).length, 1, 'The shared footer must render once');
 console.log('Routing smoke tests passed: shared layouts, pages, overlays, missing routes, catalog filters, and private route access states.');
+await store.dispatch(productsApi.util.upsertQueryData('getPublicProducts', undefined, []));
+assert.ok(!render('/shop').includes(PRODUCTS[0].name), 'An empty live catalog must not display deleted or sample products.');
+store.dispatch(productsApi.util.resetApiState());
+store.dispatch(productCategoriesApi.util.resetApiState());
