@@ -11,9 +11,13 @@ import { branchesApi } from '../features/branches/branchesApi';
 import { repairsApi } from '../features/repairs/repairsApi';
 import { productCategoriesApi } from '../features/productCategories/productCategoriesApi';
 import { productsApi } from '../features/products/productsApi';
+import { ordersApi } from '../features/orders/ordersApi';
 const sessionListener = createListenerMiddleware();
 sessionListener.startListening({ matcher: isAnyOf(productCategoriesApi.endpoints.createProductCategory.matchFulfilled, productCategoriesApi.endpoints.updateProductCategory.matchFulfilled, productCategoriesApi.endpoints.deleteProductCategory.matchFulfilled), effect: (_, { dispatch }) => {
   dispatch(productsApi.util.invalidateTags(['Products', 'ProductTemplates']));
+} });
+sessionListener.startListening({ matcher: isAnyOf(ordersApi.endpoints.checkoutOrder.matchFulfilled, ordersApi.endpoints.createOrder.matchFulfilled, ordersApi.endpoints.updateOrder.matchFulfilled, ordersApi.endpoints.updateOrderStatus.matchFulfilled, ordersApi.endpoints.deleteOrder.matchFulfilled), effect: (_, { dispatch }) => {
+  dispatch(productsApi.util.invalidateTags(['Products']));
 } });
 sessionListener.startListening({ actionCreator: logout, effect: (_, { dispatch }) => {
   dispatch(authQuerySlice.util.resetApiState());
@@ -23,6 +27,7 @@ sessionListener.startListening({ actionCreator: logout, effect: (_, { dispatch }
   dispatch(repairsApi.util.resetApiState());
   dispatch(productCategoriesApi.util.resetApiState());
   dispatch(productsApi.util.resetApiState());
+  dispatch(ordersApi.util.resetApiState());
 } });
 export const store = configureStore({
   reducer: {
@@ -36,8 +41,9 @@ export const store = configureStore({
     [repairsApi.reducerPath]: repairsApi.reducer,
     [productCategoriesApi.reducerPath]: productCategoriesApi.reducer,
     [productsApi.reducerPath]: productsApi.reducer,
+    [ordersApi.reducerPath]: ordersApi.reducer,
   },
-  middleware: (getDefaultMiddleware) => getDefaultMiddleware().prepend(sessionListener.middleware).concat(authQuerySlice.middleware, repairCatalogApi.middleware, accessApi.middleware, branchesApi.middleware, repairsApi.middleware, productCategoriesApi.middleware, productsApi.middleware),
+  middleware: (getDefaultMiddleware) => getDefaultMiddleware().prepend(sessionListener.middleware).concat(authQuerySlice.middleware, repairCatalogApi.middleware, accessApi.middleware, branchesApi.middleware, repairsApi.middleware, productCategoriesApi.middleware, productsApi.middleware, ordersApi.middleware),
 });
 if (typeof window !== 'undefined') setupListeners(store.dispatch);
 

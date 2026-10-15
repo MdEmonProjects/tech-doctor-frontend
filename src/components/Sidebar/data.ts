@@ -15,6 +15,7 @@ export const menuData: SidebarMenuItem[] = [
     subMenu: [
       { id: '31', name: 'Categories', route: 'categories', icon: '', subMenu: false, permission: 'product_categories.view' },
       { id: '32', name: 'Products', route: 'products', icon: '', subMenu: false, permission: 'products.view' },
+      { id: '33', name: 'Orders', route: 'orders', icon: '', subMenu: false, permission: 'orders.view' },
     ],
   },
   {

@@ -21,6 +21,9 @@ import { repairsApi } from '../src/features/repairs/repairsApi';
 import Products from '../src/pages/Admin/Products';
 import ProductEditor from '../src/pages/Admin/ProductEditor';
 import { productsApi } from '../src/features/products/productsApi';
+import { ordersApi, type ProductOrder } from '../src/features/orders/ordersApi';
+import Orders from '../src/pages/Admin/Orders';
+import OrderDetails from '../src/pages/Admin/OrderDetails';
 import { AppProvider } from '../src/context/AppProvider';
 import { catalogProducts, categories } from './productFixtures';
 
@@ -42,6 +45,14 @@ try {
   assert.ok(productHtml.includes('Add product') && productHtml.includes('aria-label="Edit ') && productHtml.includes('aria-label="Delete '), 'Each product action must be available with its permission.');
   productHtml = render(<AppProvider><ProductEditor /></AppProvider>);
   assert.ok(productHtml.includes('Product images') && productHtml.includes('Add specification group') && productHtml.includes('Pricing · USD'), 'Product editors must show images, dynamic specifications, and USD pricing.');
+  const order: ProductOrder = { id: 8, orderNumber: 'ORD-TD-123456', customerName: 'Order customer', email: 'order@example.invalid', phone: null, address: '123 Main Street', city: 'Boston', postalCode: '02101', items: [{ productId: 1, name: 'Charger', sku: null, quantity: 1, unitPrice: 30, image: null }], subtotal: 30, shipping: 9.99, tax: 2.48, total: 42.47, status: 'PENDING', statusNote: null, history: [{ id: 1, status: 'PENDING', eventType: 'CREATED', note: 'Order placed at checkout.', changes: null, updatedBy: null, createdAt: new Date().toISOString() }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  await store.dispatch(ordersApi.util.upsertQueryData('getOrders', undefined, [order]));
+  await store.dispatch(ordersApi.util.upsertQueryData('getOrder', 8, order));
+  actor('STAFF', ['orders.view', 'orders.status']);
+  let orderHtml = render(<AppProvider><Orders /></AppProvider>);
+  assert.ok(orderHtml.includes(order.orderNumber) && !orderHtml.includes('Create order') && !orderHtml.includes('Delete</button>'), 'Staff can view orders without create or delete controls.');
+  orderHtml = render(<AppProvider><Routes><Route path="/orders/:orderId" element={<OrderDetails />} /></Routes></AppProvider>, '/orders/8');
+  assert.ok(orderHtml.includes('Update status') && orderHtml.includes('Order history') && !orderHtml.includes('Edit order'), 'Staff can update status and review the order flow.');
   await store.dispatch(repairCatalogApi.util.upsertQueryData('getRepairCatalog', undefined, [{ id: 99, name: 'Example brand', models: [{ id: 10, name: 'Phone X', deviceType: 'Phone', services: [{ id: 11, service, price: 45 }] }] }]));
   await store.dispatch(repairCatalogApi.util.upsertQueryData('getRepairServices', undefined, [service]));
   await store.dispatch(accessApi.util.upsertQueryData('getUsers', undefined, [{ id: 2, name: 'Staff user', email: 'staff@example.invalid', roleId: 2, isActive: true, createdAt: new Date().toISOString(), assignedRole: { key: 'STAFF', name: 'Staff' } }]));
@@ -103,4 +114,5 @@ try {
   store.dispatch(branchesApi.util.resetApiState());
   store.dispatch(repairsApi.util.resetApiState());
   store.dispatch(productsApi.util.resetApiState());
+  store.dispatch(ordersApi.util.resetApiState());
 }

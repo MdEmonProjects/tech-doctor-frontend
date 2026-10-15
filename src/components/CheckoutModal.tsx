@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { CartItem } from '../types';
 import { X, CheckCircle, Lock, Truck, CreditCard } from 'lucide-react';
+import { useCheckoutOrderMutation } from '../features/orders/ordersApi';
+import { catalogError } from './RepairServiceDialog';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -21,11 +23,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [zip, setZip] = useState('');
   const [orderNumber, setOrderNumber] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [placeOrder, { isLoading: isProcessing }] = useCheckoutOrderMutation();
+  const [error, setError] = useState('');
+  const submittingRef = useRef(false);
 
   if (!isOpen) return null;
 
@@ -34,20 +39,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const tax = subtotal * 0.0825;
   const total = subtotal + shipping + tax;
 
-  const handlePlaceOrder = (e: React.FormEvent) => {
+  const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsProcessing(true);
-
-    setTimeout(() => {
-      const generatedOrder = `ORD-TD-${Math.floor(100000 + Math.random() * 900000)}`;
-      setOrderNumber(generatedOrder);
-      setIsProcessing(false);
+    if (!cart.length || isProcessing || submittingRef.current) return;
+    setError('');
+    submittingRef.current = true;
+    try {
+      const result = await placeOrder({ customerName: `${firstName.trim()} ${lastName.trim()}`.trim(), email: email.trim(), phone: phone.trim(), address: address.trim(), city: city.trim(), postalCode: zip.trim(), items: cart.map((item) => ({ productId: Number(item.product.id), quantity: item.quantity })) }).unwrap();
+      setOrderNumber(result.orderNumber);
       setStep('confirmation');
       onClearCart();
-      if (onSuccessToast) {
-        onSuccessToast(`Order #${generatedOrder} confirmed! Thank you.`);
-      }
-    }, 1200);
+      onSuccessToast?.(`Order #${result.orderNumber} placed. Thank you.`);
+    } catch (failure) { setError(catalogError(failure)); }
+    finally { submittingRef.current = false; }
   };
 
   return (
@@ -65,7 +69,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <div className="flex items-center space-x-2">
               <Lock className="w-4 h-4 text-[#D4AF37]" />
               <h3 className="text-sm font-semibold uppercase tracking-wider text-white">
-                {step === 'confirmation' ? 'Order Confirmed' : 'Insured Express Checkout'}
+                {step === 'confirmation' ? 'Order Received' : 'Insured Express Checkout'}
               </h3>
             </div>
             <button
@@ -86,26 +90,26 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
               <div>
                 <span className="text-[10px] font-mono font-semibold uppercase tracking-[0.25em] text-[#D4AF37]">
-                  TRANSACTION VERIFIED
+                  ORDER RECEIVED
                 </span>
                 <h3 className="text-2xl font-light text-white mt-1">
-                  Payment Confirmed
+                  Order Placed
                 </h3>
                 <p className="text-xs text-neutral-400 mt-1">
                   Order reference number: <strong className="text-[#D4AF37] font-mono">{orderNumber}</strong>
                 </p>
                 <p className="text-xs text-neutral-400 mt-2">
-                  A receipt and courier tracking details have been sent to <strong>{email || 'your email'}</strong>.
+                  Your order is pending review. Please keep this reference for any questions.
                 </p>
               </div>
 
               <div className="p-4 bg-[#151515] rounded-xs border border-white/5 text-xs text-neutral-400 max-w-md mx-auto text-left space-y-1.5">
                 <p className="font-semibold text-white flex items-center">
                   <Truck className="w-4 h-4 text-[#D4AF37] mr-1.5" />
-                  Estimated Delivery: 2–3 Business Days
+                  Delivery details will be confirmed after review.
                 </p>
                 <p className="text-[11px] font-light">
-                  All shipments are fully insured and packed in tamper-evident security boxes.
+                  No payment has been collected online.
                 </p>
               </div>
 
@@ -155,7 +159,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-neutral-400 mb-1">Email for Receipt &amp; Tracking *</label>
+                    <label className="block text-[11px] font-medium text-neutral-400 mb-1">Email for order updates *</label>
                   <input
                     type="email"
                     required
@@ -164,6 +168,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-[#151515] border border-white/10 rounded-xs px-3 py-2 text-xs text-white focus:outline-none focus:border-[#D4AF37]"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-neutral-400 mb-1">Phone number *</label>
+                  <input type="tel" required maxLength={25} autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Your contact number" className="w-full bg-[#151515] border border-white/10 rounded-xs px-3 py-2 text-xs text-white focus:outline-none focus:border-[#D4AF37]" />
                 </div>
 
                 <div>
@@ -204,7 +213,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
               </div>
 
-              {/* Payment Simulated Integration */}
+              {/* Payment information */}
               <div className="space-y-3 pt-3 border-t border-white/10">
                 <h4 className="text-xs font-semibold uppercase text-white tracking-wider flex items-center">
                   <CreditCard className="w-4 h-4 text-[#D4AF37] mr-1.5" />
@@ -213,29 +222,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
                 <div className="bg-[#151515] p-3 rounded-xs border border-white/10 space-y-2 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-white">Credit / Debit Card or Apple Pay</span>
+                    <span className="font-semibold text-white">Payment arranged after order review</span>
                     <span className="text-[10px] text-[#D4AF37] font-mono font-bold bg-black px-2 py-0.5 rounded-xs border border-[#D4AF37]/30">
-                      Sandbox Simulation
+                      No online charge
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="col-span-2">
-                      <input
-                        type="text"
-                        placeholder="•••• •••• •••• 4242"
-                        defaultValue="4242 •••• •••• 4242"
-                        className="w-full bg-[#0E0E0E] border border-white/10 rounded-xs px-3 py-2 text-xs font-mono text-white"
-                      />
-                    </div>
-                    <div>
-                      <input
-                        type="text"
-                        placeholder="MM/YY"
-                        defaultValue="12/28"
-                        className="w-full bg-[#0E0E0E] border border-white/10 rounded-xs px-3 py-2 text-xs text-center font-mono text-white"
-                      />
-                    </div>
-                  </div>
+                  <p className="text-neutral-400">Staff will confirm your order and payment options using your email.</p>
                 </div>
               </div>
 
@@ -261,17 +253,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
               </div>
 
+              {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
               <button
                 type="submit"
                 disabled={isProcessing}
                 className="w-full bg-[#D4AF37] hover:bg-[#C19A2F] disabled:bg-neutral-800 text-black font-semibold text-xs tracking-wider uppercase py-3.5 rounded-xs shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer"
               >
                 {isProcessing ? (
-                  <span>Processing Secure Transmission...</span>
+                  <span>Placing order...</span>
                 ) : (
                   <>
                     <Lock className="w-4 h-4 text-black" />
-                    <span>PAY ${total.toFixed(2)} &amp; COMPLETE ORDER</span>
+                    <span>PLACE ORDER · ${total.toFixed(2)}</span>
                   </>
                 )}
               </button>

@@ -42,6 +42,9 @@ import ProductCategories from '../pages/Admin/ProductCategories';
 import Products from '../pages/Admin/Products';
 import ProductEditor from '../pages/Admin/ProductEditor';
 import ProductDetails from '../pages/Admin/ProductDetails';
+import Orders from '../pages/Admin/Orders';
+import OrderEditor from '../pages/Admin/OrderEditor';
+import OrderDetails from '../pages/Admin/OrderDetails';
 
 export function AppRoutes() {
   const location = useLocation();
@@ -121,6 +124,12 @@ export function AppRoutes() {
             <Route element={<PermissionRoute permission="products.update" />}>
               <Route path="products-devices/products/:productId/edit" element={<ProductEditor />} />
             </Route>
+          </Route>
+          <Route element={<PermissionRoute permission="orders.view" />}>
+            <Route path="products-devices/orders" element={<Orders />} />
+            <Route path="products-devices/orders/:orderId" element={<OrderDetails />} />
+            <Route element={<PermissionRoute permission="orders.create" />}><Route path="products-devices/orders/new" element={<OrderEditor />} /></Route>
+            <Route element={<PermissionRoute permission="orders.update" />}><Route path="products-devices/orders/:orderId/edit" element={<OrderEditor />} /></Route>
           </Route>
           <Route element={<PermissionRoute permission="repairs.view" />}>
             <Route path="repair-service/repair-tracking" element={<RepairTracking />} />

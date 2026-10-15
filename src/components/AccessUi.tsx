@@ -7,7 +7,7 @@ export const accessButton = 'inline-flex items-center justify-center gap-2 round
 export const accessSecondary = 'rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-slate-50 disabled:opacity-50';
 
 export function AccessPage({ title, description, action, children }: { title: string; description: string; action?: ReactNode; children: ReactNode }) {
-  return <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-5 sm:py-6 lg:px-8"><section className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+  return <div className="mx-auto w-full max-w-[1400px] px-3 py-4 text-slate-900 sm:px-5 sm:py-6 lg:px-8"><section className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
     <header className="flex flex-wrap items-center justify-between gap-4 border-b border-border p-5 sm:px-6"><div><h1 className="text-xl font-semibold text-foreground">{title}</h1><p className="mt-1 max-w-2xl text-sm text-muted">{description}</p></div>{action}</header>
     <div className="space-y-4 p-5 sm:p-6">{children}</div>
   </section></div>;
